@@ -1,0 +1,29 @@
+{
+  "name": "Excel to Cards Importer",
+  "description": "Import Excel data and convert them into Trello cards with flexible field mapping",
+  "details": "Transform your Excel spreadsheets into Trello cards with an intuitive field mapping interface. Supports custom syntax for combining multiple columns into card fields.",
+  "author": "Excel PowerUp Developer",
+  "version": "1.0.0",
+  "capabilities": [
+    "board-buttons",
+    "callback",
+    "card-buttons"
+  ],
+  "connectors": {
+    "iframe": {
+      "url": "./html/main.html",
+      "width": "800",
+      "height": "600"
+    }
+  },
+  "icon": {
+    "dark": "./assets/icon-dark.svg",
+    "light": "./assets/icon-light.svg"
+  },
+  "categories": ["import", "productivity", "automation"],
+  "author": "Excel PowerUp Developer",
+  "homepage": "https://github.com/yourusername/trello-excel-powerup",
+  "repository": "https://github.com/yourusername/trello-excel-powerup.git",
+  "bugs": "https://github.com/yourusername/trello-excel-powerup/issues",
+  "keywords": ["excel", "import", "cards", "automation", "productivity"]
+}

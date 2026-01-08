@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Excel to Cards Importer</title>
+    <link rel="stylesheet" href="../css/styles.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div class="header">
+            <h1>📊 Excel to Cards Importer</h1>
+            <p>Transform your Excel data into Trello cards with flexible field mapping and powerful syntax parsing</p>
+        </div>
+
+        <!-- File Upload Section -->
+        <div class="file-upload-section" id="dropZone">
+            <div class="upload-icon">📁</div>
+            <h2>Upload Your Excel File</h2>
+            <p>Drag and drop your Excel file here, or click to browse</p>
+            <p><strong>Supported formats:</strong> .xlsx, .xls, .csv</p>
+            <button type="button" class="upload-btn">Choose File</button>
+            <input type="file" id="excelFile" accept=".xlsx,.xls,.csv" />
+        </div>
+
+        <!-- Syntax Help Section -->
+        <div class="syntax-help" id="syntaxHelp">
+            <!-- Populated by JavaScript -->
+        </div>
+
+        <!-- Field Mappings Section -->
+        <div id="mappingsSection">
+            <div id="fieldMappings">
+                <!-- Populated dynamically after file upload -->
+            </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="actions">
+            <button type="button" class="btn btn-secondary" id="resetBtn">🔄 Reset</button>
+            <button type="button" class="btn btn-success" id="previewBtn">👁️ Preview</button>
+            <button type="button" class="btn btn-primary" id="importBtn">📥 Import Cards</button>
+        </div>
+    </div>
+
+    <!-- Loading Indicator -->
+    <div id="loadingIndicator">
+        <div class="loading-content">
+            <div class="loading-spinner"></div>
+            <div class="loading-message">Processing...</div>
+        </div>
+    </div>
+
+    <!-- Include SheetJS for Excel parsing -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.3/package/dist/xlsx.full.min.js"></script>
+    
+    <!-- Include Trello Power-Up client library -->
+    <script src="https://p.trellocdn.com/power-up.min.js"></script>
+    
+    <!-- Main application script -->
+    <script src="../js/main.js"></script>
+</body>
+</html>

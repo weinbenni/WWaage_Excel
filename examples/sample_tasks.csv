@@ -1,0 +1,11 @@
+Task Name,Description,Location,Due Date,Priority,Assigned To,Department,Estimated Hours,Status
+Complete Project Proposal,Finalize and submit the Q4 project proposal,New York Office,2026-01-15,High,John Smith,Operations,8,Not Started
+Review Marketing Materials,Review and approve new marketing campaign materials,Remote,2026-01-12,Medium,Sarah Johnson,Marketing,4,In Progress
+Update Website Content,Update product descriptions and pricing on website,Home Office,2026-01-20,Low,Mike Davis,Development,6,Not Started
+Client Meeting Preparation,Prepare presentation and materials for client meeting,Client Site - Boston,2026-01-10,High,Emily Wilson,Sales,3,In Progress
+Code Review Session,Review pull requests and provide feedback,San Francisco Office,2026-01-18,Medium,Alex Brown,Engineering,5,Not Started
+Documentation Update,Update API documentation with new endpoints,Remote,2026-01-25,Low,Lisa Anderson,Technical Writing,7,Not Started
+Bug Fix - Login Issue,Fix authentication bug affecting user login,Austin Office,2026-01-14,Critical,David Martinez,QA,2,In Progress
+Feature Implementation,Implement user dashboard with analytics,Remote,2026-01-30,High,Jennifer Taylor,Product,12,Not Started
+Team Standup Meeting,Daily team sync and progress updates,Virtual Meeting,2026-01-11,Medium,Team,All Teams,1,Not Started
+Sprint Planning,Plan tasks and priorities for next sprint,Chicago Office,2026-01-16,High,Project Manager,Management,4,Not Started
