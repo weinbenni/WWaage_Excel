@@ -1,0 +1,19 @@
+{
+  "name": "Excel Card Importer",
+  "details": "Import Excel data and convert rows into Trello cards",
+  "icon": {
+    "url": "./icon.png"
+  },
+  "author": "Your Name",
+  "capabilities": [
+    "board-buttons",
+    "show-settings"
+  ],
+  "connectors": {
+    "iframe": {
+      "url": "./index.html",
+      "height": 500
+    }
+  },
+  "tags": ["productivity", "import", "excel"]
+}
