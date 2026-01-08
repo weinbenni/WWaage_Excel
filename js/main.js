@@ -39,10 +39,10 @@ class ExcelToCardsImporter {
   
   init() {
     try {
-      this.t.render(() => {
+      this.t.render(() => { 
         this.setupEventListeners();
         this.setupSyntaxHelp();
-        console.log('Excel to Cards Importer initialized successfully');
+        console.log('Excel to Cards Importer initialized successfully!');
       });
     } catch (error) {
       console.error('Initialization error:', error);
