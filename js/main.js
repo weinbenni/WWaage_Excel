@@ -37,17 +37,19 @@ class ExcelToCardsImporter {
     this.init();
   }
   
-  async init() {
+  init() {
     try {
-      await this.t.render();
-      this.setupEventListeners();
-      this.setupSyntaxHelp();
-      console.log('Excel to Cards Importer initialized successfully');
+      this.t.render(() => {
+        this.setupEventListeners();
+        this.setupSyntaxHelp();
+        console.log('Excel to Cards Importer initialized successfully');
+      });
     } catch (error) {
       console.error('Initialization error:', error);
       this.showError('Failed to initialize the Power-Up. Please refresh and try again.');
     }
   }
+
   
   setupEventListeners() {
     // File upload handler
