@@ -37,7 +37,7 @@ window.TrelloPowerUp.initialize({
     }];
   }
 }, {
-  appKey: 'YOUR_TRELLO_APP_KEY',
+  appKey: 'c9df6f6f1cd31f277375aa5dd43041c8',
   appName: 'Excel to Cards Importer',
   appAuthor: 'Excel PowerUp Developer'
 });
