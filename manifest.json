@@ -22,8 +22,8 @@
   },
   "categories": ["import", "productivity", "automation"],
   "author": "Excel PowerUp Developer",
-  "homepage": "https://github.com/yourusername/trello-excel-powerup",
-  "repository": "https://github.com/yourusername/trello-excel-powerup.git",
-  "bugs": "https://github.com/yourusername/trello-excel-powerup/issues",
+  "homepage": "https://weinbenni.github.io/WWaage_Excel/",
+  "repository": "https://github.com/weinbenni/WWaage_Excel.git",
+  "bugs": "https://github.com/weinbenni/WWaage_Excel/issues",
   "keywords": ["excel", "import", "cards", "automation", "productivity"]
 }
