@@ -11,7 +11,7 @@
   ],
   "connectors": {
     "iframe": {
-      "url": "./html/main.html",
+      "url": "https://weinbenni.github.io/WWaage_Excel/html/main.html",
       "width": "800",
       "height": "600"
     }
