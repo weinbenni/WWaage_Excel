@@ -10,7 +10,7 @@ window.TrelloPowerUp.initialize({
       callback: function(t) {
         return t.modal({
           title: 'Excel to Cards Importer',
-          url: './html/main.html',
+          url: t.signUrl('./html/main.html'),
           accentColor: '#0079BF',
           height: 650,
           width: 900
