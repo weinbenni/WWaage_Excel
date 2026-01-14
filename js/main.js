@@ -368,9 +368,16 @@ class ExcelToCardsImporter {
   
   async createTrelloCard(listId, cardData) {
     try {
-      const token = await this.t.getRestApi().getToken();
+      // Try to authorize the user first
+      const token = await this.t.getRestApi().authorize({ scope: 'read,write' });
       
-      // Build the card payload (without key and token)
+      console.log('Token retrieved:', token ? 'Yes' : 'No');
+      
+      if (!token) {
+        throw new Error('Failed to get authorization token. Please authorize the Power-Up.');
+      }
+      
+      // Build the card payload
       const cardPayload = {
         name: cardData.cardName,
         desc: cardData.description || '',
@@ -385,6 +392,8 @@ class ExcelToCardsImporter {
       // Key and token go in the URL as query parameters
       const url = `https://api.trello.com/1/cards?key=c9df6f6f1cd31f277375aa5dd43041c8&token=${token}`;
       
+      console.log('Attempting to create card with URL:', url.replace(token, 'TOKEN_HIDDEN'));
+      
       const response = await fetch(url, {
         method: 'POST',
         headers: {
@@ -395,6 +404,7 @@ class ExcelToCardsImporter {
       
       if (!response.ok) {
         const errorText = await response.text();
+        console.error('Trello API Error Response:', errorText);
         throw new Error(`Trello API error: ${response.status} - ${errorText}`);
       }
       
@@ -408,6 +418,7 @@ class ExcelToCardsImporter {
       
       return card;
     } catch (error) {
+      console.error('Full error:', error);
       throw new Error(`Failed to create card: ${error.message}`);
     }
   }
