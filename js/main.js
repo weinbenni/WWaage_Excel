@@ -368,42 +368,57 @@ class ExcelToCardsImporter {
   
   async createTrelloCard(listId, cardData) {
     try {
-      // Get the REST API token
       const token = await this.t.getRestApi().getToken();
       
-      // Use fetch to create the card
+      // Use direct fetch to Trello API
       const cardPayload = {
         name: cardData.cardName,
         desc: cardData.description || '',
         pos: 'bottom',
-        idList: listId
+        idList: listId,
+        key: 'c9df6f6f1cd31f277375aa5dd43041c8',
+        token: token
       };
       
       if (cardData.dueDate) {
         cardPayload.due = cardData.dueDate;
       }
       
-      const response = await this.t.getRestApi().post('cards', cardPayload);
+      const response = await fetch('https://api.trello.com/1/cards', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(cardPayload)
+      });
       
-      // Add labels if specified
-      if (cardData.labels && response.id) {
-        const labelNames = cardData.labels.split(',').map(l => l.trim()).filter(l => l);
-        await this.addLabelsToCard(response.id, labelNames);
+      if (!response.ok) {
+        throw new Error(`Trello API error: ${response.status}`);
       }
       
-      return response;
+      const card = await response.json();
+      
+      // Add labels if specified
+      if (cardData.labels && card.id) {
+        const labelNames = cardData.labels.split(',').map(l => l.trim()).filter(l => l);
+        await this.addLabelsToCard(card.id, labelNames, token);
+      }
+      
+      return card;
     } catch (error) {
       throw new Error(`Failed to create card: ${error.message}`);
     }
   }
   
-  async addLabelsToCard(cardId, labelNames) {
+  async addLabelsToCard(cardId, labelNames, token) {
     try {
       const boardData = await this.t.board('id');
-      const restApi = this.t.getRestApi();
       
       // Get existing labels on the board
-      const boardLabels = await restApi.get(`boards/${boardData.id}/labels`);
+      const labelsResponse = await fetch(
+        `https://api.trello.com/1/boards/${boardData.id}/labels?key=c9df6f6f1cd31f277375aa5dd43041c8&token=${token}`
+      );
+      const boardLabels = await labelsResponse.json();
       
       for (const labelName of labelNames) {
         // Find existing label or create new one
@@ -414,16 +429,26 @@ class ExcelToCardsImporter {
           const colors = ['green', 'yellow', 'orange', 'red', 'purple', 'blue', 'sky', 'lime', 'pink', 'black'];
           const randomColor = colors[Math.floor(Math.random() * colors.length)];
           
-          label = await restApi.post(`boards/${boardData.id}/labels`, {
-            name: labelName,
-            color: randomColor
-          });
+          const createLabelResponse = await fetch(
+            `https://api.trello.com/1/labels?key=c9df6f6f1cd31f277375aa5dd43041c8&token=${token}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                name: labelName,
+                color: randomColor,
+                idBoard: boardData.id
+              })
+            }
+          );
+          label = await createLabelResponse.json();
         }
         
         // Add label to card
-        await restApi.post(`cards/${cardId}/idLabels`, {
-          value: label.id
-        });
+        await fetch(
+          `https://api.trello.com/1/cards/${cardId}/idLabels?key=c9df6f6f1cd31f277375aa5dd43041c8&token=${token}&value=${label.id}`,
+          { method: 'POST' }
+        );
       }
     } catch (error) {
       console.error('Error adding labels:', error);
