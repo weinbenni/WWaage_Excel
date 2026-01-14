@@ -270,7 +270,7 @@ class ExcelToCardsImporter {
     container.querySelectorAll('.add-column-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const fieldId = e.target.dataset.field;
-        this.showColumnPicker(fieldId);
+        this.showColumnPicker(fieldId, e);
       });
     });
     
@@ -292,7 +292,7 @@ class ExcelToCardsImporter {
     document.getElementById('mappingsSection').style.display = 'block';
   }
   
-  showColumnPicker(fieldId) {
+  showColumnPicker(fieldId, event) {
     const items = this.columns.map(col => ({
       text: `📊 ${col}`,
       callback: (t) => {
@@ -300,10 +300,11 @@ class ExcelToCardsImporter {
         return t.closePopup();
       }
     }));
-    
+
     this.t.popup({
       title: 'Select Column',
-      items: items
+      items: items,
+      mouseEvent: event
     });
   }
   
