@@ -9,6 +9,8 @@ class ExcelToCardsImporter {
     
     this.excelData = null;
     this.columns = [];
+    this.queryParts = {}; // Track query builder parts
+    this.uploadedFileName = null; // Track uploaded file name
     this.fieldMappings = {
       cardName: '',
       description: '',
@@ -126,11 +128,13 @@ class ExcelToCardsImporter {
       const data = await this.readExcelFile(file);
       this.excelData = data;
       this.columns = Object.keys(data[0] || {});
+      this.uploadedFileName = file.name;
       
       if (this.columns.length === 0) {
         throw new Error('No data found in the Excel file');
       }
       
+      this.showFileInfo(file.name, data.length, this.columns.length);
       this.renderFieldMappings();
       this.showSuccess(`File processed successfully! Found ${data.length} rows and ${this.columns.length} columns.`);
       
@@ -140,6 +144,39 @@ class ExcelToCardsImporter {
     } finally {
       this.hideLoading();
     }
+  }
+  
+  showFileInfo(fileName, rowCount, columnCount) {
+    const dropZone = document.getElementById('dropZone');
+    dropZone.innerHTML = `
+      <div class="file-info-display">
+        <div class="file-icon">✅</div>
+        <h3>File Uploaded Successfully</h3>
+        <div class="file-details">
+          <div class="file-detail-item">
+            <span class="detail-label">📄 File Name:</span>
+            <span class="detail-value">${fileName}</span>
+          </div>
+          <div class="file-detail-item">
+            <span class="detail-label">📊 Rows:</span>
+            <span class="detail-value">${rowCount}</span>
+          </div>
+          <div class="file-detail-item">
+            <span class="detail-label">📋 Columns:</span>
+            <span class="detail-value">${columnCount}</span>
+          </div>
+        </div>
+        <div class="column-list">
+          <strong>Available Columns:</strong>
+          <div class="column-chips">
+            ${this.columns.map(col => `<span class="column-chip">${col}</span>`).join('')}
+          </div>
+        </div>
+        <button type="button" class="upload-another-btn" onclick="document.getElementById('excelFile').click()">
+          📁 Upload Different File
+        </button>
+      </div>
+    `;
   }
   
   readExcelFile(file) {
@@ -197,43 +234,48 @@ class ExcelToCardsImporter {
               ${field.label}
               ${field.required ? '<span class="required-indicator">*</span>' : ''}
             </label>
-            <div class="mapping-controls">
-              <select id="field-${field.id}" class="column-select" data-field="${field.id}">
-                <option value="">-- Select Column --</option>
-                ${this.columns.map(col => `
-                  <option value="${col}">${col}</option>
-                `).join('')}
-              </select>
-              <button type="button" class="syntax-btn" data-field="${field.id}" title="Use syntax editor">
-                📝
-              </button>
-            </div>
             <small class="field-description">${field.description}</small>
-            <div class="syntax-editor" id="syntax-${field.id}" style="display: none;">
-              <textarea 
-                class="syntax-input" 
-                placeholder="e.g., %ColumnName1 + '; ' + %ColumnName2"
-                rows="2"
-              ></textarea>
-              <button type="button" class="apply-syntax-btn" data-field="${field.id}">Apply</button>
+            
+            <div class="query-builder" id="builder-${field.id}">
+              <div class="query-display" id="display-${field.id}" data-field="${field.id}">
+                <span class="placeholder">Click + to add columns</span>
+              </div>
+              <div class="query-actions">
+                <button type="button" class="add-column-btn" data-field="${field.id}" title="Add column">
+                  + Add Column
+                </button>
+                <button type="button" class="add-text-btn" data-field="${field.id}" title="Add custom text">
+                  + Add Text
+                </button>
+                <button type="button" class="clear-query-btn" data-field="${field.id}" title="Clear">
+                  Clear
+                </button>
+              </div>
             </div>
           </div>
         `).join('')}
       </div>
     `;
     
-    // Add event listeners for syntax editors
-    container.querySelectorAll('.syntax-btn').forEach(btn => {
+    // Add event listeners for query builder buttons
+    container.querySelectorAll('.add-column-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const fieldId = e.target.dataset.field;
-        this.toggleSyntaxEditor(fieldId);
+        this.showColumnPicker(fieldId);
       });
     });
     
-    container.querySelectorAll('.apply-syntax-btn').forEach(btn => {
+    container.querySelectorAll('.add-text-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
         const fieldId = e.target.dataset.field;
-        this.applySyntax(fieldId);
+        this.showTextInput(fieldId);
+      });
+    });
+    
+    container.querySelectorAll('.clear-query-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const fieldId = e.target.dataset.field;
+        this.clearQuery(fieldId);
       });
     });
     
@@ -241,42 +283,158 @@ class ExcelToCardsImporter {
     document.getElementById('mappingsSection').style.display = 'block';
   }
   
-  toggleSyntaxEditor(fieldId) {
-    const editor = document.getElementById(`syntax-${fieldId}`);
-    const isVisible = editor.style.display !== 'none';
-    editor.style.display = isVisible ? 'none' : 'block';
-    
-    if (!isVisible) {
-      const textarea = editor.querySelector('.syntax-input');
-      const select = document.getElementById(`field-${fieldId}`);
-      if (select.value && !textarea.value) {
-        textarea.value = `%${select.value}`;
+  showColumnPicker(fieldId) {
+    const items = this.columns.map(col => ({
+      text: `📊 ${col}`,
+      callback: (t) => {
+        this.addToQuery(fieldId, 'column', col);
+        return t.closePopup();
       }
-      textarea.focus();
+    }));
+    
+    this.t.popup({
+      title: 'Select Column',
+      items: items
+    });
+  }
+  
+  showTextInput(fieldId) {
+    const modal = document.createElement('div');
+    modal.className = 'text-input-modal';
+    modal.innerHTML = `
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>Add Custom Text</h3>
+          <button type="button" class="close-modal">&times;</button>
+        </div>
+        <div class="modal-body">
+          <input type="text" id="customText" class="custom-text-input" placeholder='Enter text (e.g., ", " or "\\n" for new line)'>
+          <div class="modal-actions">
+            <button type="button" class="btn btn-secondary cancel-text">Cancel</button>
+            <button type="button" class="btn btn-primary add-text">Add</button>
+          </div>
+        </div>
+      </div>
+    `;
+    
+    document.body.appendChild(modal);
+    
+    const input = modal.querySelector('#customText');
+    input.focus();
+    
+    const addText = () => {
+      const text = input.value;
+      if (text) {
+        this.addToQuery(fieldId, 'text', text);
+      }
+      document.body.removeChild(modal);
+    };
+    
+    modal.querySelector('.add-text').addEventListener('click', addText);
+    modal.querySelector('.cancel-text').addEventListener('click', () => {
+      document.body.removeChild(modal);
+    });
+    modal.querySelector('.close-modal').addEventListener('click', () => {
+      document.body.removeChild(modal);
+    });
+    
+    input.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        addText();
+      }
+    });
+    
+    modal.addEventListener('click', (e) => {
+      if (e.target === modal) {
+        document.body.removeChild(modal);
+      }
+    });
+  }
+  
+  addToQuery(fieldId, type, value) {
+    const display = document.getElementById(`display-${fieldId}`);
+    
+    // Initialize query parts if not exists
+    if (!this.queryParts) {
+      this.queryParts = {};
+    }
+    if (!this.queryParts[fieldId]) {
+      this.queryParts[fieldId] = [];
+    }
+    
+    // Add the new part
+    this.queryParts[fieldId].push({ type, value });
+    
+    // Update display
+    this.updateQueryDisplay(fieldId);
+    
+    // Build the syntax string
+    this.buildSyntax(fieldId);
+  }
+  
+  updateQueryDisplay(fieldId) {
+    const display = document.getElementById(`display-${fieldId}`);
+    const parts = this.queryParts[fieldId] || [];
+    
+    if (parts.length === 0) {
+      display.innerHTML = '<span class="placeholder">Click + to add columns</span>';
+      return;
+    }
+    
+    display.innerHTML = parts.map((part, index) => {
+      const badge = part.type === 'column' 
+        ? `<span class="query-badge column-badge">📊 ${part.value}</span>`
+        : `<span class="query-badge text-badge">"${part.value}"</span>`;
+      
+      return `${badge}<button class="remove-part-btn" data-field="${fieldId}" data-index="${index}">×</button>`;
+    }).join('');
+    
+    // Add remove listeners
+    display.querySelectorAll('.remove-part-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const field = e.target.dataset.field;
+        const index = parseInt(e.target.dataset.index);
+        this.removeFromQuery(field, index);
+      });
+    });
+  }
+  
+  removeFromQuery(fieldId, index) {
+    if (this.queryParts[fieldId]) {
+      this.queryParts[fieldId].splice(index, 1);
+      this.updateQueryDisplay(fieldId);
+      this.buildSyntax(fieldId);
     }
   }
   
-  applySyntax(fieldId) {
-    const editor = document.getElementById(`syntax-${fieldId}`);
-    const textarea = editor.querySelector('.syntax-input');
-    const syntax = textarea.value.trim();
-    
-    if (syntax) {
-      this.fieldMappings[fieldId] = syntax;
-      this.showSuccess(`Syntax applied to ${this.availableFields.find(f => f.id === fieldId)?.label}`);
-      editor.style.display = 'none';
+  clearQuery(fieldId) {
+    if (this.queryParts) {
+      this.queryParts[fieldId] = [];
     }
+    this.fieldMappings[fieldId] = '';
+    this.updateQueryDisplay(fieldId);
   }
   
-  handleMappingChange(e) {
-    const field = e.target.dataset.field;
-    const value = e.target.value;
+  buildSyntax(fieldId) {
+    const parts = this.queryParts[fieldId] || [];
     
-    if (value) {
-      this.fieldMappings[field] = `%${value}`;
-    } else {
-      delete this.fieldMappings[field];
+    if (parts.length === 0) {
+      this.fieldMappings[fieldId] = '';
+      return;
     }
+    
+    // Build syntax string: %Column1 + " " + %Column2
+    const syntaxParts = parts.map(part => {
+      if (part.type === 'column') {
+        return `%${part.value}`;
+      } else {
+        // Escape the text for JavaScript string
+        return `"${part.value}"`;
+      }
+    });
+    
+    this.fieldMappings[fieldId] = syntaxParts.join(' + ');
+    console.log(`Built syntax for ${fieldId}:`, this.fieldMappings[fieldId]);
   }
   
   parseSyntax(syntax, rowData) {
