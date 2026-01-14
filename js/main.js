@@ -368,21 +368,25 @@ class ExcelToCardsImporter {
   
   async createTrelloCard(listId, cardData) {
     try {
-      const restApi = await this.t.getRestApi();
+      // Get the REST API token
+      const token = await this.t.getRestApi().getToken();
       
+      // Use fetch to create the card
       const cardPayload = {
         name: cardData.cardName,
         desc: cardData.description || '',
         pos: 'bottom',
-        due: cardData.dueDate || null
+        idList: listId
       };
       
-      const response = await restApi.create('cards', 'POST', cardPayload, {
-        idList: listId
-      });
+      if (cardData.dueDate) {
+        cardPayload.due = cardData.dueDate;
+      }
+      
+      const response = await this.t.getRestApi().post('cards', cardPayload);
       
       // Add labels if specified
-      if (cardData.labels) {
+      if (cardData.labels && response.id) {
         const labelNames = cardData.labels.split(',').map(l => l.trim()).filter(l => l);
         await this.addLabelsToCard(response.id, labelNames);
       }
@@ -395,11 +399,11 @@ class ExcelToCardsImporter {
   
   async addLabelsToCard(cardId, labelNames) {
     try {
-      const boardData = await this.t.board('all');
-      const restApi = await this.t.getRestApi();
+      const boardData = await this.t.board('id');
+      const restApi = this.t.getRestApi();
       
       // Get existing labels on the board
-      const boardLabels = await restApi.getAll(`boards/${boardData.id}/labels`);
+      const boardLabels = await restApi.get(`boards/${boardData.id}/labels`);
       
       for (const labelName of labelNames) {
         // Find existing label or create new one
@@ -410,15 +414,14 @@ class ExcelToCardsImporter {
           const colors = ['green', 'yellow', 'orange', 'red', 'purple', 'blue', 'sky', 'lime', 'pink', 'black'];
           const randomColor = colors[Math.floor(Math.random() * colors.length)];
           
-          label = await restApi.create('labels', 'POST', {
+          label = await restApi.post(`boards/${boardData.id}/labels`, {
             name: labelName,
-            color: randomColor,
-            idBoard: boardData.id
+            color: randomColor
           });
         }
         
         // Add label to card
-        await restApi.create('cards/' + cardId + '/idLabels', 'POST', {
+        await restApi.post(`cards/${cardId}/idLabels`, {
           value: label.id
         });
       }
