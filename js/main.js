@@ -172,11 +172,20 @@ class ExcelToCardsImporter {
             ${this.columns.map(col => `<span class="column-chip">${col}</span>`).join('')}
           </div>
         </div>
-        <button type="button" class="upload-another-btn" onclick="document.getElementById('excelFile').click()">
+        <button type="button" class="upload-another-btn">
           📁 Upload Different File
         </button>
+        <input type="file" id="excelFile" accept=".xlsx,.xls,.csv" />
       </div>
     `;
+
+    // Re-attach file input event listener after DOM replacement
+    const fileInput = document.getElementById('excelFile');
+    fileInput.addEventListener('change', (e) => this.handleFileUpload(e));
+
+    // Attach click handler to the upload button
+    const uploadBtn = dropZone.querySelector('.upload-another-btn');
+    uploadBtn.addEventListener('click', () => fileInput.click());
   }
   
   readExcelFile(file) {
@@ -748,6 +757,8 @@ class ExcelToCardsImporter {
   resetForm() {
     this.excelData = null;
     this.columns = [];
+    this.queryParts = {};
+    this.uploadedFileName = null;
     this.fieldMappings = {
       cardName: '',
       description: '',
@@ -756,11 +767,25 @@ class ExcelToCardsImporter {
       labels: '',
       members: ''
     };
-    
-    document.getElementById('excelFile').value = '';
+
     document.getElementById('fieldMappings').innerHTML = '';
     document.getElementById('mappingsSection').style.display = 'none';
-    
+
+    // Restore original drop zone content
+    const dropZone = document.getElementById('dropZone');
+    dropZone.innerHTML = `
+      <div class="upload-icon">📁</div>
+      <h2>Upload Your Excel File</h2>
+      <p>Drag and drop your Excel file here, or click to browse</p>
+      <p><strong>Supported formats:</strong> .xlsx, .xls, .csv</p>
+      <button type="button" class="upload-btn">Choose File</button>
+      <input type="file" id="excelFile" accept=".xlsx,.xls,.csv" />
+    `;
+
+    // Re-attach file input event listener
+    const fileInput = document.getElementById('excelFile');
+    fileInput.addEventListener('change', (e) => this.handleFileUpload(e));
+
     this.showSuccess('Form reset successfully!');
   }
   
