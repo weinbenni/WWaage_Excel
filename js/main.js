@@ -6,6 +6,7 @@ class ExcelToCardsImporter {
       appKey: 'c9df6f6f1cd31f277375aa5dd43041c8',
       appName: 'Excel to Cards Importer'
     });
+    
     this.excelData = null;
     this.columns = [];
     this.fieldMappings = {
@@ -291,7 +292,7 @@ class ExcelToCardsImporter {
         const value = rowData[columnName] || '';
         // Escape quotes in the value
         const escapedValue = JSON.stringify(value);
-        expression = expression.replace(new RegExp(match.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&'), 'g'), escapedValue);
+        expression = expression.replace(new RegExp(match.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), escapedValue);
       });
       
       // Evaluate the expression
@@ -316,7 +317,6 @@ class ExcelToCardsImporter {
       
       this.showLoading('Creating Trello cards...');
       
-      const boardData = await this.t.board('all');
       const lists = await this.t.lists('all');
       
       if (lists.length === 0) {
@@ -346,7 +346,7 @@ class ExcelToCardsImporter {
           });
           
           // Create card via Trello REST API
-          const card = await this.createTrelloCard(targetList.id, cardData);
+          await this.createTrelloCard(targetList.id, cardData);
           results.success++;
           
         } catch (error) {
@@ -377,7 +377,9 @@ class ExcelToCardsImporter {
         due: cardData.dueDate || null
       };
       
-      const response = await restApi.post(`/lists/${listId}/cards`, cardPayload);
+      const response = await restApi.create('cards', 'POST', cardPayload, {
+        idList: listId
+      });
       
       // Add labels if specified
       if (cardData.labels) {
@@ -397,7 +399,7 @@ class ExcelToCardsImporter {
       const restApi = await this.t.getRestApi();
       
       // Get existing labels on the board
-      const boardLabels = await restApi.get(`/boards/${boardData.id}/labels`);
+      const boardLabels = await restApi.getAll(`boards/${boardData.id}/labels`);
       
       for (const labelName of labelNames) {
         // Find existing label or create new one
@@ -408,14 +410,15 @@ class ExcelToCardsImporter {
           const colors = ['green', 'yellow', 'orange', 'red', 'purple', 'blue', 'sky', 'lime', 'pink', 'black'];
           const randomColor = colors[Math.floor(Math.random() * colors.length)];
           
-          label = await restApi.post(`/boards/${boardData.id}/labels`, {
+          label = await restApi.create('labels', 'POST', {
             name: labelName,
-            color: randomColor
+            color: randomColor,
+            idBoard: boardData.id
           });
         }
         
         // Add label to card
-        await restApi.post(`/cards/${cardId}/idLabels`, {
+        await restApi.create('cards/' + cardId + '/idLabels', 'POST', {
           value: label.id
         });
       }
