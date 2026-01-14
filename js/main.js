@@ -1,11 +1,7 @@
 // Main application logic for Excel to Cards Importer
 class ExcelToCardsImporter {
   constructor() {
-    this.t = window.TrelloPowerUp.iframe({
-      appKey: 'c9df6f6f1cd31f277375aa5dd43041c8',
-      appName: 'Excel to Cards Importer',
-      appAuthor: 'Excel PowerUp Developer'
-    });
+    this.t = window.TrelloPowerUp.iframe();
     
     this.excelData = null;
     this.columns = [];

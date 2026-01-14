@@ -6,24 +6,19 @@
   "version": "1.0.0",
   "capabilities": [
     "board-buttons",
-    "callback",
     "card-buttons"
   ],
   "connectors": {
     "iframe": {
-      "url": "https://weinbenni.github.io/WWaage_Excel/html/main.html",
-      "width": "800",
-      "height": "600"
+      "url": "https://weinbenni.github.io/trello-excel-powerup/index.html"
     }
   },
   "icon": {
-    "dark": "./assets/icon-dark.svg",
-    "light": "./assets/icon-light.svg"
+    "url": "https://weinbenni.github.io/trello-excel-powerup/assets/icon-light.svg"
   },
   "categories": ["import", "productivity", "automation"],
-  "author": "Excel PowerUp Developer",
-  "homepage": "https://weinbenni.github.io/WWaage_Excel/",
-  "repository": "https://github.com/weinbenni/WWaage_Excel.git",
-  "bugs": "https://github.com/weinbenni/WWaage_Excel/issues",
+  "homepage": "https://weinbenni.github.io/trello-excel-powerup/",
+  "repository": "https://github.com/weinbenni/trello-excel-powerup",
+  "bugs": "https://github.com/weinbenni/trello-excel-powerup/issues",
   "keywords": ["excel", "import", "cards", "automation", "productivity"]
 }
