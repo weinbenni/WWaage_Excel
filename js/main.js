@@ -370,21 +370,22 @@ class ExcelToCardsImporter {
     try {
       const token = await this.t.getRestApi().getToken();
       
-      // Use direct fetch to Trello API
+      // Build the card payload (without key and token)
       const cardPayload = {
         name: cardData.cardName,
         desc: cardData.description || '',
         pos: 'bottom',
-        idList: listId,
-        key: 'c9df6f6f1cd31f277375aa5dd43041c8',
-        token: token
+        idList: listId
       };
       
       if (cardData.dueDate) {
         cardPayload.due = cardData.dueDate;
       }
       
-      const response = await fetch('https://api.trello.com/1/cards', {
+      // Key and token go in the URL as query parameters
+      const url = `https://api.trello.com/1/cards?key=c9df6f6f1cd31f277375aa5dd43041c8&token=${token}`;
+      
+      const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -393,7 +394,8 @@ class ExcelToCardsImporter {
       });
       
       if (!response.ok) {
-        throw new Error(`Trello API error: ${response.status}`);
+        const errorText = await response.text();
+        throw new Error(`Trello API error: ${response.status} - ${errorText}`);
       }
       
       const card = await response.json();
