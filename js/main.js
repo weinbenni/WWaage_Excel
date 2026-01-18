@@ -30,10 +30,10 @@ class ExcelToCardsImporter {
     ];
     
     this.syntaxExamples = [
-      { syntax: '%ColumnName1', description: 'Single column value' },
-      { syntax: '%ColumnName1 + "; " + %ColumnName2', description: 'Combine two columns with separator' },
-      { syntax: '%ColumnName1 + "\\n" + %ColumnName2', description: 'Combine with line break' },
-      { syntax: '"Location: " + %Location + "\\nDate: " + %Date', description: 'Add custom text with column values' }
+      { syntax: '%[Column Name]', description: 'Single column value' },
+      { syntax: '%[Column1] + "; " + %[Column2]', description: 'Combine two columns with separator' },
+      { syntax: '%[Column1] + "\\n" + %[Column2]', description: 'Combine with line break' },
+      { syntax: '"Location: " + %[Location] + "\\nDate: " + %[Date]', description: 'Add custom text with column values' }
     ];
     
     this.init();
@@ -427,48 +427,56 @@ class ExcelToCardsImporter {
   
   buildSyntax(fieldId) {
     const parts = this.queryParts[fieldId] || [];
-    
+
     if (parts.length === 0) {
       this.fieldMappings[fieldId] = '';
       return;
     }
-    
-    // Build syntax string: %Column1 + " " + %Column2
+
+    // Build syntax string using bracket notation: %[Column Name] + "text"
     const syntaxParts = parts.map(part => {
       if (part.type === 'column') {
-        return `%${part.value}`;
+        // Use brackets to clearly delimit column names with spaces
+        return `%[${part.value}]`;
       } else {
-        // Escape the text for JavaScript string
-        return `"${part.value}"`;
+        // Use JSON.stringify to properly escape all special characters
+        return JSON.stringify(part.value);
       }
     });
-    
+
     this.fieldMappings[fieldId] = syntaxParts.join(' + ');
     console.log(`Built syntax for ${fieldId}:`, this.fieldMappings[fieldId]);
   }
   
   parseSyntax(syntax, rowData) {
+    // Early return for empty syntax
+    if (!syntax || syntax.trim() === '') {
+      return '';
+    }
+
     try {
-      // Replace %ColumnName patterns with actual values
       let expression = syntax;
-      
-      // Find all column references
-      const columnMatches = syntax.match(/%([a-zA-Z0-9_\s]+)/g) || [];
-      
+
+      // Find all column references in format %[Column Name]
+      const columnMatches = syntax.match(/%\[([^\]]+)\]/g) || [];
+
       columnMatches.forEach(match => {
-        const columnName = match.substring(1); // Remove %
-        const value = rowData[columnName] || '';
-        // Escape quotes in the value
-        const escapedValue = JSON.stringify(value);
-        expression = expression.replace(new RegExp(match.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), escapedValue);
+        // Extract column name from %[Column Name] format
+        const columnName = match.slice(2, -1);
+        const value = rowData[columnName] !== undefined ? rowData[columnName] : '';
+        // Safely escape the value for JavaScript string context
+        const escapedValue = JSON.stringify(String(value));
+        // Escape regex special chars in the match pattern for replacement
+        const escapedMatch = match.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        expression = expression.replace(new RegExp(escapedMatch, 'g'), escapedValue);
       });
-      
+
       // Evaluate the expression
       // eslint-disable-next-line no-eval
       const result = eval(expression);
       return String(result || '');
     } catch (error) {
-      console.error('Syntax parsing error:', error);
+      console.error('Syntax parsing error:', error, 'Syntax:', syntax);
       return `Error: ${error.message}`;
     }
   }
