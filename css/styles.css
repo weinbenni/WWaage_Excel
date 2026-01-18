@@ -6,19 +6,21 @@
 }
 
 body {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  font-family: 'Open Sans', Arial, sans-serif;
+  background: #ffffff;
   min-height: 100vh;
-  color: #2c3e50;
+  color: #666;
+  font-size: 14px;
+  font-weight: 500;
 }
 
 .container {
-  max-width: 1200px;
+  max-width: 1080px;
   margin: 0 auto;
   padding: 20px;
   background: white;
   min-height: 100vh;
-  box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+  box-shadow: none;
 }
 
 /* Header Styles */
@@ -26,26 +28,28 @@ body {
   text-align: center;
   margin-bottom: 40px;
   padding: 30px 0;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #2ea3f2;
   color: white;
-  border-radius: 12px;
+  border-radius: 0;
   margin: -20px -20px 40px -20px;
   padding-left: 20px;
   padding-right: 20px;
 }
 
 .header h1 {
-  font-size: 2.5rem;
-  font-weight: 700;
+  font-size: 30px;
+  font-weight: 500;
   margin-bottom: 10px;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  text-shadow: none;
+  color: #333;
 }
 
 .header p {
-  font-size: 1.1rem;
-  opacity: 0.95;
+  font-size: 14px;
+  opacity: 1;
   max-width: 600px;
   margin: 0 auto;
+  color: #666;
 }
 
 /* File Upload Section */
@@ -60,21 +64,22 @@ body {
 }
 
 .file-upload-section.drag-over {
-  border-color: #0079BF;
-  background: #e3f2fd;
-  transform: scale(1.02);
+  border-color: #2ea3f2;
+  background: #f0f9ff;
+  transform: scale(1.01);
 }
 
 .upload-icon {
   font-size: 3rem;
   margin-bottom: 20px;
-  color: #0079BF;
+  color: #2ea3f2;
 }
 
 .file-upload-section h2 {
-  color: #2c3e50;
+  color: #333;
   margin-bottom: 15px;
-  font-weight: 600;
+  font-weight: 500;
+  font-size: 26px;
 }
 
 .file-upload-section p {
@@ -84,25 +89,27 @@ body {
 }
 
 .upload-btn {
-  background: linear-gradient(135deg, #0079BF 0%, #005885 100%);
-  color: white;
-  border: none;
-  padding: 14px 28px;
-  font-size: 1rem;
-  font-weight: 600;
-  border-radius: 8px;
+  background: transparent;
+  color: #2ea3f2;
+  border: 2px solid #2ea3f2;
+  padding: 0.3em 20px;
+  font-size: 20px;
+  font-weight: 500;
+  border-radius: 3px;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0 4px 15px rgba(0, 121, 191, 0.3);
+  box-shadow: none;
 }
 
 .upload-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0, 121, 191, 0.4);
+  background: #2ea3f2;
+  color: white;
+  transform: none;
+  box-shadow: none;
 }
 
 .upload-btn:active {
-  transform: translateY(0);
+  transform: none;
 }
 
 #excelFile {
@@ -137,15 +144,15 @@ body {
 }
 
 .mapping-item.required {
-  border-left: 4px solid #0079BF;
+  border-left: 4px solid #2ea3f2;
 }
 
 .mapping-item label {
   display: block;
-  font-weight: 600;
+  font-weight: 500;
   margin-bottom: 12px;
-  color: #2c3e50;
-  font-size: 1.1rem;
+  color: #333;
+  font-size: 22px;
 }
 
 .required-indicator {
@@ -171,8 +178,8 @@ body {
 
 .column-select:focus {
   outline: none;
-  border-color: #0079BF;
-  box-shadow: 0 0 0 3px rgba(0, 121, 191, 0.1);
+  border-color: #2ea3f2;
+  box-shadow: 0 0 0 3px rgba(46, 163, 242, 0.1);
 }
 
 .syntax-btn {
@@ -220,8 +227,8 @@ body {
 
 .syntax-input:focus {
   outline: none;
-  border-color: #0079BF;
-  box-shadow: 0 0 0 3px rgba(0, 121, 191, 0.1);
+  border-color: #2ea3f2;
+  box-shadow: 0 0 0 3px rgba(46, 163, 242, 0.1);
 }
 
 .apply-syntax-btn {
@@ -251,10 +258,10 @@ body {
 }
 
 .syntax-help h4 {
-  color: #1565c0;
+  color: #2ea3f2;
   margin-bottom: 20px;
-  font-size: 1.2rem;
-  font-weight: 600;
+  font-size: 22px;
+  font-weight: 500;
 }
 
 .syntax-examples {
@@ -269,7 +276,7 @@ body {
   padding: 12px;
   background: white;
   border-radius: 6px;
-  border-left: 3px solid #0079BF;
+  border-left: 3px solid #2ea3f2;
 }
 
 .syntax-example code {
@@ -297,49 +304,51 @@ body {
 }
 
 .btn {
-  padding: 14px 28px;
-  border: none;
-  border-radius: 8px;
-  font-size: 1rem;
-  font-weight: 600;
+  padding: 0.3em 20px;
+  border: 2px solid;
+  border-radius: 3px;
+  font-size: 20px;
+  font-weight: 500;
   cursor: pointer;
   transition: all 0.3s ease;
   text-decoration: none;
   display: inline-block;
   text-align: center;
+  background: transparent;
+  box-shadow: none;
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #0079BF 0%, #005885 100%);
-  color: white;
-  box-shadow: 0 4px 15px rgba(0, 121, 191, 0.3);
+  border-color: #2ea3f2;
+  color: #2ea3f2;
 }
 
 .btn-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(0, 121, 191, 0.4);
+  background: #2ea3f2;
+  color: white;
+  transform: none;
 }
 
 .btn-secondary {
-  background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
-  color: white;
-  box-shadow: 0 4px 15px rgba(108, 117, 125, 0.3);
+  border-color: #bbb;
+  color: #666;
 }
 
 .btn-secondary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(108, 117, 125, 0.4);
+  background: #bbb;
+  color: white;
+  transform: none;
 }
 
 .btn-success {
-  background: linear-gradient(135deg, #28a745 0%, #218838 100%);
-  color: white;
-  box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+  border-color: #28a745;
+  color: #28a745;
 }
 
 .btn-success:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(40, 167, 69, 0.4);
+  background: #28a745;
+  color: white;
+  transform: none;
 }
 
 .btn:disabled {
@@ -374,7 +383,7 @@ body {
   width: 50px;
   height: 50px;
   border: 4px solid #f3f3f3;
-  border-top: 4px solid #0079BF;
+  border-top: 4px solid #2ea3f2;
   border-radius: 50%;
   animation: spin 1s linear infinite;
   margin: 0 auto 20px;
@@ -387,7 +396,7 @@ body {
 
 .loading-message {
   font-size: 1.2rem;
-  color: #2c3e50;
+  color: #333;
   font-weight: 500;
 }
 
@@ -412,11 +421,11 @@ body {
 }
 
 .notification.success {
-  background: linear-gradient(135deg, #28a745 0%, #218838 100%);
+  background: #28a745;
 }
 
 .notification.error {
-  background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
+  background: #dc3545;
 }
 
 /* Modal Styles */
@@ -454,8 +463,9 @@ body {
 }
 
 .modal-header h3 {
-  color: #2c3e50;
-  font-weight: 600;
+  color: #333;
+  font-weight: 500;
+  font-size: 22px;
   margin: 0;
 }
 
@@ -494,9 +504,10 @@ body {
 }
 
 .preview-card h4 {
-  color: #0079BF;
+  color: #2ea3f2;
   margin-bottom: 15px;
-  font-weight: 600;
+  font-weight: 500;
+  font-size: 22px;
 }
 
 .preview-field {
@@ -707,7 +718,7 @@ body {
   }
   
   .header {
-    background: #0079BF;
+    background: #2ea3f2;
     color: white;
   }
   
@@ -737,7 +748,7 @@ body {
 }
 
 .query-display:hover {
-  border-color: #0079BF;
+  border-color: #2ea3f2;
 }
 
 .query-display .placeholder {
@@ -756,13 +767,13 @@ body {
 }
 
 .column-badge {
-  background: linear-gradient(135deg, #0079BF 0%, #005885 100%);
+  background: #2ea3f2;
   color: white;
-  box-shadow: 0 2px 6px rgba(0, 121, 191, 0.3);
+  box-shadow: 0 2px 6px rgba(46, 163, 242, 0.3);
 }
 
 .text-badge {
-  background: linear-gradient(135deg, #28a745 0%, #218838 100%);
+  background: #28a745;
   color: white;
   box-shadow: 0 2px 6px rgba(40, 167, 69, 0.3);
 }
@@ -809,36 +820,45 @@ body {
 }
 
 .add-column-btn {
-  background: linear-gradient(135deg, #0079BF 0%, #005885 100%);
-  color: white;
-  box-shadow: 0 2px 8px rgba(0, 121, 191, 0.3);
+  background: transparent;
+  color: #2ea3f2;
+  border: 2px solid #2ea3f2;
+  box-shadow: none;
 }
 
 .add-column-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 121, 191, 0.4);
+  background: #2ea3f2;
+  color: white;
+  transform: none;
+  box-shadow: none;
 }
 
 .add-text-btn {
-  background: linear-gradient(135deg, #28a745 0%, #218838 100%);
-  color: white;
-  box-shadow: 0 2px 8px rgba(40, 167, 69, 0.3);
+  background: transparent;
+  color: #28a745;
+  border: 2px solid #28a745;
+  box-shadow: none;
 }
 
 .add-text-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(40, 167, 69, 0.4);
+  background: #28a745;
+  color: white;
+  transform: none;
+  box-shadow: none;
 }
 
 .clear-query-btn {
-  background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
-  color: white;
-  box-shadow: 0 2px 8px rgba(108, 117, 125, 0.3);
+  background: transparent;
+  color: #666;
+  border: 2px solid #bbb;
+  box-shadow: none;
 }
 
 .clear-query-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(108, 117, 125, 0.4);
+  background: #bbb;
+  color: white;
+  transform: none;
+  box-shadow: none;
 }
 
 /* Text Input Modal */
@@ -872,8 +892,8 @@ body {
 
 .custom-text-input:focus {
   outline: none;
-  border-color: #0079BF;
-  box-shadow: 0 0 0 3px rgba(0, 121, 191, 0.1);
+  border-color: #2ea3f2;
+  box-shadow: 0 0 0 3px rgba(46, 163, 242, 0.1);
 }
 
 /* File Info Display */
@@ -896,8 +916,8 @@ body {
 .file-info-display h3 {
   color: #28a745;
   margin-bottom: 20px;
-  font-weight: 600;
-  font-size: 1.4rem;
+  font-weight: 500;
+  font-size: 22px;
 }
 
 .file-details {
@@ -926,7 +946,7 @@ body {
 }
 
 .detail-value {
-  color: #0079BF;
+  color: #2ea3f2;
   font-weight: 500;
 }
 
@@ -942,7 +962,7 @@ body {
 .column-list strong {
   display: block;
   margin-bottom: 12px;
-  color: #2c3e50;
+  color: #333;
   font-size: 1.05rem;
 }
 
@@ -953,37 +973,39 @@ body {
 }
 
 .column-chip {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: #2ea3f2;
   color: white;
   padding: 6px 12px;
   border-radius: 6px;
   font-size: 0.85rem;
   font-weight: 500;
-  box-shadow: 0 2px 6px rgba(102, 126, 234, 0.3);
+  box-shadow: 0 2px 6px rgba(46, 163, 242, 0.3);
   transition: all 0.3s ease;
 }
 
 .column-chip:hover {
   transform: translateY(-2px);
-  box-shadow: 0 4px 10px rgba(102, 126, 234, 0.4);
+  box-shadow: 0 4px 10px rgba(46, 163, 242, 0.4);
 }
 
 .upload-another-btn {
-  background: linear-gradient(135deg, #6c757d 0%, #5a6268 100%);
-  color: white;
-  border: none;
-  padding: 12px 24px;
-  font-size: 1rem;
-  font-weight: 600;
-  border-radius: 8px;
+  background: transparent;
+  color: #666;
+  border: 2px solid #bbb;
+  padding: 0.3em 20px;
+  font-size: 20px;
+  font-weight: 500;
+  border-radius: 3px;
   cursor: pointer;
   transition: all 0.3s ease;
-  box-shadow: 0 4px 15px rgba(108, 117, 125, 0.3);
+  box-shadow: none;
 }
 
 .upload-another-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(108, 117, 125, 0.4);
+  background: #bbb;
+  color: white;
+  transform: none;
+  box-shadow: none;
 }
 
 /* Responsive adjustments for query builder */

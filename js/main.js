@@ -459,7 +459,7 @@ class ExcelToCardsImporter {
 
       // Find all column references in format %[Column Name]
       const columnMatches = syntax.match(/%\[([^\]]+)\]/g) || [];
-
+      console.log('Column matches found:', columnMatches);
       columnMatches.forEach(match => {
         // Extract column name from %[Column Name] format
         const columnName = match.slice(2, -1);
