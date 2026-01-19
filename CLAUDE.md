@@ -11,6 +11,7 @@ This is a Trello Power-Up that allows importing Excel data (.xlsx, .xls, .csv) a
 - Visual query builder for mapping Excel columns to Trello card fields
 - Custom syntax combining columns with text (e.g., `%[Column Name] + " - " + %[Other Column]`)
 - **Address parsing**: Automatic detection and extraction of address components (PLZ, City, Street, Number)
+- **Address merging**: Automatically combine separate Straße, Ort, PLZ columns into complete addresses
 - Create Trello cards via REST API with labels, due dates, members, etc.
 
 ## Development Setup
@@ -214,6 +215,54 @@ Hauptstraße 15
 
 // Location field combining components
 "📍 " + %[Address:street] + " " + %[Address:number] + ", " + %[Address:city]
+```
+
+### Address Merging Feature (NEW)
+
+When Excel has separate columns for address components (common in Austrian/German databases), the Power-Up automatically detects and offers to merge them.
+
+**Detected Column Names** (`detectAddressComponentColumns()` at line ~154):
+- **Straße/Street**: `straße`, `strasse`, `street`
+- **Ort/City**: `ort`, `city`, `stadt`, `place`
+- **PLZ**: `plz`, `postleitzahl`, `postal`, `zip`
+- **Number**: `hausnummer`, `hausnr`, `number`, `nr`
+
+**Merge Format**:
+```
+"Hauptstraße 15, 5020 Salzburg"
+(Street Number, PLZ City)
+```
+
+**UI Behavior**:
+- If address components detected, "🏠 Merged Address" appears at top of column picker
+- Shows which columns will be merged: `🏠 Merged Address (from Straße, Ort)`
+- Purple badge with component indicator in query builder
+- Separator line between merged option and individual columns
+
+**Technical Details**:
+- Type: `merged-address`
+- Syntax: `%[MERGE:{JSON-encoded components}]`
+- Component mapping stored as JSON: `{"street":"Straße","city":"Ort","plz":"PLZ","number":"Hausnummer"}`
+- `buildAddressFromComponents()`: Combines available components (line ~167)
+- Handles missing components gracefully (e.g., if no PLZ column exists)
+
+**Example Usage**:
+```javascript
+// Excel has columns: Straße, Hausnummer, PLZ, Ort
+// User selects "Merged Address" option
+// Result: "Hauptstraße 15, 5020 Salzburg"
+
+// If some columns missing (only Straße and Ort):
+// Result: "Hauptstraße, Salzburg"
+```
+
+**Common Patterns**:
+```javascript
+// Use merged address as location
+Location: [Select Merged Address option]
+
+// Combine with custom text
+"📍 " + %[MERGE:...] + "\n" + "Austria"
 ```
 
 ### Trello API Authentication
