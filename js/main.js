@@ -33,7 +33,9 @@ class ExcelToCardsImporter {
       { syntax: '%[Column Name]', description: 'Single column value' },
       { syntax: '%[Column1] + "; " + %[Column2]', description: 'Combine two columns with separator' },
       { syntax: '%[Column1] + "\\n" + %[Column2]', description: 'Combine with line break' },
-      { syntax: '"Location: " + %[Location] + "\\nDate: " + %[Date]', description: 'Add custom text with column values' }
+      { syntax: '"Location: " + %[Location] + "\\nDate: " + %[Date]', description: 'Add custom text with column values' },
+      { syntax: '%[Address:plz] + " " + %[Address:city]', description: 'Extract PLZ and City from address column' },
+      { syntax: '%[Address:street] + " " + %[Address:number]', description: 'Extract street and number from address' }
     ];
     
     this.init();
@@ -97,6 +99,101 @@ class ExcelToCardsImporter {
         `).join('')}
       </div>
     `;
+  }
+
+  // Check if a column contains address data
+  isAddressColumn(columnName) {
+    if (!this.excelData || this.excelData.length === 0) return false;
+
+    // Check column name for address keywords
+    const nameMatch = /adresse|address|anschrift|standort|location/i.test(columnName);
+
+    // Sample first few non-empty values
+    const sampleSize = Math.min(5, this.excelData.length);
+    let addressCount = 0;
+
+    for (let i = 0; i < sampleSize; i++) {
+      const value = String(this.excelData[i][columnName] || '').trim();
+      if (this.looksLikeAddress(value)) {
+        addressCount++;
+      }
+    }
+
+    // If column name matches OR more than 60% of samples look like addresses
+    return nameMatch || (addressCount / sampleSize) > 0.6;
+  }
+
+  // Detect if a string looks like an address
+  looksLikeAddress(text) {
+    if (!text || text.length < 10) return false;
+
+    // Austrian/German address patterns:
+    // - Contains numbers (street number or PLZ)
+    // - Contains street indicators (Straße, str., -gasse, etc.)
+    // - Has postal code pattern (4-5 digits)
+    const hasNumber = /\d/.test(text);
+    const hasStreetIndicator = /(straße|strasse|str\.|gasse|weg|platz|allee|ring)/i.test(text);
+    const hasPostalCode = /\b\d{4,5}\b/.test(text);
+    const hasCommaOrNewline = /[,\n]/.test(text);
+
+    return hasNumber && (hasStreetIndicator || hasPostalCode || hasCommaOrNewline);
+  }
+
+  // Parse address into components
+  parseAddress(addressString) {
+    const address = {
+      plz: '',
+      city: '',
+      street: '',
+      number: ''
+    };
+
+    if (!addressString) return address;
+
+    const text = String(addressString).trim();
+
+    // Pattern 1: "Street Number, PLZ City" or "Street Number\nPLZ City"
+    // Pattern 2: "PLZ City, Street Number"
+
+    // Split by comma or newline
+    const parts = text.split(/[,\n]+/).map(p => p.trim()).filter(p => p);
+
+    for (const part of parts) {
+      // Try to extract PLZ (4-5 digit postal code) and city
+      const plzCityMatch = part.match(/^(\d{4,5})\s+(.+)$/);
+      if (plzCityMatch) {
+        address.plz = plzCityMatch[1];
+        address.city = plzCityMatch[2];
+        continue;
+      }
+
+      // Try to extract street and number
+      const streetMatch = part.match(/^(.+?)\s+(\d+[a-zA-Z]?(?:\/\d+)?)$/);
+      if (streetMatch) {
+        address.street = streetMatch[1];
+        address.number = streetMatch[2];
+        continue;
+      }
+
+      // If no pattern matched, try to guess based on content
+      if (/^\d{4,5}/.test(part)) {
+        // Starts with PLZ
+        const match = part.match(/^(\d{4,5})\s*(.*)$/);
+        if (match) {
+          address.plz = match[1];
+          if (match[2]) address.city = match[2];
+        }
+      } else if (/\d+[a-zA-Z]?$/.test(part)) {
+        // Ends with number (likely street + number)
+        const match = part.match(/^(.+?)\s+(\d+[a-zA-Z]?(?:\/\d+)?)$/);
+        if (match) {
+          address.street = match[1];
+          address.number = match[2];
+        }
+      }
+    }
+
+    return address;
   }
   
   handleDragOver(e) {
@@ -293,17 +390,79 @@ class ExcelToCardsImporter {
   }
   
   showColumnPicker(fieldId, event) {
-    const items = this.columns.map(col => ({
-      text: `📊 ${col}`,
-      callback: (t) => {
-        this.addToQuery(fieldId, 'column', col);
-        return t.closePopup();
+    const items = this.columns.map(col => {
+      const isAddress = this.isAddressColumn(col);
+
+      if (isAddress) {
+        // Create a parent item with submenu for address components
+        return {
+          text: `🏠 ${col} (Address)`,
+          callback: (t) => {
+            // Show address component picker
+            this.showAddressComponentPicker(fieldId, col, event);
+            return t.closePopup();
+          }
+        };
+      } else {
+        return {
+          text: `📊 ${col}`,
+          callback: (t) => {
+            this.addToQuery(fieldId, 'column', col);
+            return t.closePopup();
+          }
+        };
       }
-    }));
+    });
 
     this.t.popup({
       title: 'Select Column',
       items: items,
+      mouseEvent: event
+    });
+  }
+
+  showAddressComponentPicker(fieldId, columnName, event) {
+    const components = [
+      {
+        text: '📊 Full Address',
+        callback: (t) => {
+          this.addToQuery(fieldId, 'column', columnName);
+          return t.closePopup();
+        }
+      },
+      {
+        text: '📮 PLZ (Postal Code)',
+        callback: (t) => {
+          this.addToQuery(fieldId, 'address', `${columnName}:plz`);
+          return t.closePopup();
+        }
+      },
+      {
+        text: '🏙️ City',
+        callback: (t) => {
+          this.addToQuery(fieldId, 'address', `${columnName}:city`);
+          return t.closePopup();
+        }
+      },
+      {
+        text: '🛣️ Street',
+        callback: (t) => {
+          this.addToQuery(fieldId, 'address', `${columnName}:street`);
+          return t.closePopup();
+        }
+      },
+      {
+        text: '🔢 Street Number',
+        callback: (t) => {
+          this.addToQuery(fieldId, 'address', `${columnName}:number`);
+          return t.closePopup();
+        }
+      }
+    ];
+
+    this.t.popup({
+      title: `Address Components: ${columnName}`,
+      items: components,
       mouseEvent: event
     });
   }
@@ -385,20 +544,33 @@ class ExcelToCardsImporter {
   updateQueryDisplay(fieldId) {
     const display = document.getElementById(`display-${fieldId}`);
     const parts = this.queryParts[fieldId] || [];
-    
+
     if (parts.length === 0) {
       display.innerHTML = '<span class="placeholder">Click + to add columns</span>';
       return;
     }
-    
+
     display.innerHTML = parts.map((part, index) => {
-      const badge = part.type === 'column' 
-        ? `<span class="query-badge column-badge">📊 ${part.value}</span>`
-        : `<span class="query-badge text-badge">"${part.value}"</span>`;
-      
+      let badge;
+      if (part.type === 'column') {
+        badge = `<span class="query-badge column-badge">📊 ${part.value}</span>`;
+      } else if (part.type === 'address') {
+        const [columnName, component] = part.value.split(':');
+        const componentLabels = {
+          plz: '📮 PLZ',
+          city: '🏙️ City',
+          street: '🛣️ Street',
+          number: '🔢 Number'
+        };
+        const label = componentLabels[component] || component;
+        badge = `<span class="query-badge address-badge">🏠 ${columnName}.${label}</span>`;
+      } else {
+        badge = `<span class="query-badge text-badge">"${part.value}"</span>`;
+      }
+
       return `${badge}<button class="remove-part-btn" data-field="${fieldId}" data-index="${index}">×</button>`;
     }).join('');
-    
+
     // Add remove listeners
     display.querySelectorAll('.remove-part-btn').forEach(btn => {
       btn.addEventListener('click', (e) => {
@@ -438,6 +610,9 @@ class ExcelToCardsImporter {
       if (part.type === 'column') {
         // Use brackets to clearly delimit column names with spaces
         return `%[${part.value}]`;
+      } else if (part.type === 'address') {
+        // Address components use special syntax: %[Column:component]
+        return `%[${part.value}]`;
       } else {
         // Use JSON.stringify to properly escape all special characters
         return JSON.stringify(part.value);
@@ -457,13 +632,30 @@ class ExcelToCardsImporter {
     try {
       let expression = syntax;
 
-      // Find all column references in format %[Column Name]
+      // Find all column references in format %[Column Name] or %[Column:component]
       const columnMatches = syntax.match(/%\[([^\]]+)\]/g) || [];
       console.log('Column matches found:', columnMatches);
       columnMatches.forEach(match => {
-        // Extract column name from %[Column Name] format
-        const columnName = match.slice(2, -1);
-        const value = rowData[columnName] !== undefined ? rowData[columnName] : '';
+        // Extract content from %[...] format
+        const content = match.slice(2, -1);
+
+        let value = '';
+
+        // Check if this is an address component reference (contains colon)
+        if (content.includes(':')) {
+          const [columnName, component] = content.split(':');
+          const addressString = rowData[columnName];
+
+          if (addressString) {
+            // Parse the address and extract the requested component
+            const parsedAddress = this.parseAddress(addressString);
+            value = parsedAddress[component] || '';
+          }
+        } else {
+          // Regular column reference
+          value = rowData[content] !== undefined ? rowData[content] : '';
+        }
+
         // Safely escape the value for JavaScript string context
         const escapedValue = JSON.stringify(String(value));
         // Escape regex special chars in the match pattern for replacement
