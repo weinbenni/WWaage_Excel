@@ -10,6 +10,7 @@ This is a Trello Power-Up that allows importing Excel data (.xlsx, .xls, .csv) a
 - Upload and parse Excel files using SheetJS
 - Visual query builder for mapping Excel columns to Trello card fields
 - Custom syntax combining columns with text (e.g., `%[Column Name] + " - " + %[Other Column]`)
+- **Address parsing**: Automatic detection and extraction of address components (PLZ, City, Street, Number)
 - Create Trello cards via REST API with labels, due dates, members, etc.
 
 ## Development Setup
@@ -162,6 +163,58 @@ The Reset button (`resetForm()` at line 591) must clear THREE things:
 - Handles special chars: `%[Name-1]`, `%[Column (Draft)]`
 
 When parsing, use regex: `/%\[([^\]]+)\]/g` to extract column name between brackets.
+
+### Address Parsing Feature (NEW)
+
+The Power-Up now automatically detects address columns and allows extraction of specific components.
+
+**Address Detection** (`isAddressColumn()` at line ~102):
+- Checks column names for keywords: `adresse`, `address`, `anschrift`, `standort`, `location`
+- Samples first 5 rows and checks if they look like addresses
+- Uses 60% threshold for automatic detection
+
+**Address Component Syntax**:
+- `%[AddressColumn:plz]` - Extracts postal code (4-5 digits)
+- `%[AddressColumn:city]` - Extracts city name
+- `%[AddressColumn:street]` - Extracts street name
+- `%[AddressColumn:number]` - Extracts street number (handles variants like 12a, 15/2)
+
+**Supported Address Formats**:
+```
+Hauptstraße 15, 5020 Salzburg
+Mozartstraße 12a
+5020 Salzburg
+Salzburg, PLZ 5020
+
+// Multi-line formats:
+Hauptstraße 15
+5020 Salzburg
+```
+
+**UI Elements**:
+- Address columns show with 🏠 icon in column picker
+- Submenu with component options: Full Address, PLZ, City, Street, Street Number
+- Purple badges (#8300E9) for address components in query builder
+- Format: `🏠 ColumnName.📮 PLZ` or `🏠 ColumnName.🏙️ City`
+
+**Implementation Details**:
+- `isAddressColumn()`: Detection logic (line ~102)
+- `looksLikeAddress()`: Pattern matching (line ~122)
+- `parseAddress()`: Component extraction (line ~133)
+- `showAddressComponentPicker()`: UI for selecting components (line ~422)
+- `parseSyntax()`: Handles `%[Column:component]` syntax when evaluating (line ~624)
+
+**Common Patterns**:
+```javascript
+// Extract full address with PLZ and City on separate line
+%[Address:street] + " " + %[Address:number] + "\n" + %[Address:plz] + " " + %[Address:city]
+
+// Just postal code and city
+%[Address:plz] + " " + %[Address:city]
+
+// Location field combining components
+"📍 " + %[Address:street] + " " + %[Address:number] + ", " + %[Address:city]
+```
 
 ### Trello API Authentication
 
