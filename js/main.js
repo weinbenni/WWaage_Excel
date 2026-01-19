@@ -34,8 +34,8 @@ class ExcelToCardsImporter {
       { syntax: '%[Column1] + "; " + %[Column2]', description: 'Combine two columns with separator' },
       { syntax: '%[Column1] + "\\n" + %[Column2]', description: 'Combine with line break' },
       { syntax: '"Location: " + %[Location] + "\\nDate: " + %[Date]', description: 'Add custom text with column values' },
-      { syntax: '%[Address:plz] + " " + %[Address:city]', description: 'Extract PLZ and City from address column' },
-      { syntax: '%[Address:street] + " " + %[Address:number]', description: 'Extract street and number from address' }
+      { syntax: 'Merged Address', description: 'Auto-merge Straße, Ort, PLZ columns (if detected)' },
+      { syntax: '%[Address:plz] + " " + %[Address:city]', description: 'Extract PLZ and City from address column' }
     ];
     
     this.init();
@@ -137,6 +137,69 @@ class ExcelToCardsImporter {
     const hasCommaOrNewline = /[,\n]/.test(text);
 
     return hasNumber && (hasStreetIndicator || hasPostalCode || hasCommaOrNewline);
+  }
+
+  // Detect if we have separate address component columns
+  detectAddressComponentColumns() {
+    if (!this.columns || this.columns.length === 0) return null;
+
+    const components = {
+      street: null,
+      number: null,
+      plz: null,
+      city: null
+    };
+
+    // Common German column names for address components
+    const patterns = {
+      street: /^(stra(ß|ss)e|street|strasse)$/i,
+      number: /^(haus(nr|nummer)|number|nr\.?)$/i,
+      plz: /^(plz|postleitzahl|postal|zip)$/i,
+      city: /^(ort|city|stadt|place)$/i
+    };
+
+    // Check each column against patterns
+    this.columns.forEach(col => {
+      for (const [component, pattern] of Object.entries(patterns)) {
+        if (pattern.test(col.trim())) {
+          components[component] = col;
+          break;
+        }
+      }
+    });
+
+    // Return components if we found at least street or city
+    if (components.street || components.city) {
+      return components;
+    }
+
+    return null;
+  }
+
+  // Build address from separate components
+  buildAddressFromComponents(rowData, components) {
+    const parts = [];
+
+    // Format: "Street Number, PLZ City"
+    if (components.street && rowData[components.street]) {
+      let streetPart = String(rowData[components.street]).trim();
+      if (components.number && rowData[components.number]) {
+        streetPart += ' ' + String(rowData[components.number]).trim();
+      }
+      parts.push(streetPart);
+    }
+
+    if (components.plz && rowData[components.plz]) {
+      let cityPart = String(rowData[components.plz]).trim();
+      if (components.city && rowData[components.city]) {
+        cityPart += ' ' + String(rowData[components.city]).trim();
+      }
+      parts.push(cityPart);
+    } else if (components.city && rowData[components.city]) {
+      parts.push(String(rowData[components.city]).trim());
+    }
+
+    return parts.join(', ');
   }
 
   // Parse address into components
@@ -390,27 +453,46 @@ class ExcelToCardsImporter {
   }
   
   showColumnPicker(fieldId, event) {
-    const items = this.columns.map(col => {
+    const items = [];
+
+    // Check if we have separate address component columns
+    const addressComponents = this.detectAddressComponentColumns();
+    if (addressComponents) {
+      items.push({
+        text: '🏠 Merged Address (from ' +
+              [addressComponents.street, addressComponents.city].filter(x => x).join(', ') + ')',
+        callback: (t) => {
+          this.addToQuery(fieldId, 'merged-address', JSON.stringify(addressComponents));
+          return t.closePopup();
+        }
+      });
+      items.push({
+        text: '---' // Separator
+      });
+    }
+
+    // Add regular column items
+    this.columns.forEach(col => {
       const isAddress = this.isAddressColumn(col);
 
       if (isAddress) {
         // Create a parent item with submenu for address components
-        return {
+        items.push({
           text: `🏠 ${col} (Address)`,
           callback: (t) => {
             // Show address component picker
             this.showAddressComponentPicker(fieldId, col, event);
             return t.closePopup();
           }
-        };
+        });
       } else {
-        return {
+        items.push({
           text: `📊 ${col}`,
           callback: (t) => {
             this.addToQuery(fieldId, 'column', col);
             return t.closePopup();
           }
-        };
+        });
       }
     });
 
@@ -564,6 +646,10 @@ class ExcelToCardsImporter {
         };
         const label = componentLabels[component] || component;
         badge = `<span class="query-badge address-badge">🏠 ${columnName}.${label}</span>`;
+      } else if (part.type === 'merged-address') {
+        const components = JSON.parse(part.value);
+        const componentNames = [components.street, components.city].filter(x => x).join(', ');
+        badge = `<span class="query-badge address-badge">🏠 Merged (${componentNames})</span>`;
       } else {
         badge = `<span class="query-badge text-badge">"${part.value}"</span>`;
       }
@@ -613,6 +699,9 @@ class ExcelToCardsImporter {
       } else if (part.type === 'address') {
         // Address components use special syntax: %[Column:component]
         return `%[${part.value}]`;
+      } else if (part.type === 'merged-address') {
+        // Merged address uses special syntax: %[MERGE:components]
+        return `%[MERGE:${part.value}]`;
       } else {
         // Use JSON.stringify to properly escape all special characters
         return JSON.stringify(part.value);
@@ -632,7 +721,7 @@ class ExcelToCardsImporter {
     try {
       let expression = syntax;
 
-      // Find all column references in format %[Column Name] or %[Column:component]
+      // Find all column references in format %[Column Name], %[Column:component], or %[MERGE:...]
       const columnMatches = syntax.match(/%\[([^\]]+)\]/g) || [];
       console.log('Column matches found:', columnMatches);
       columnMatches.forEach(match => {
@@ -641,8 +730,19 @@ class ExcelToCardsImporter {
 
         let value = '';
 
+        // Check if this is a merged address reference
+        if (content.startsWith('MERGE:')) {
+          const componentsJson = content.substring(6);
+          try {
+            const components = JSON.parse(componentsJson);
+            value = this.buildAddressFromComponents(rowData, components);
+          } catch (e) {
+            console.error('Error parsing merged address components:', e);
+            value = '';
+          }
+        }
         // Check if this is an address component reference (contains colon)
-        if (content.includes(':')) {
+        else if (content.includes(':')) {
           const [columnName, component] = content.split(':');
           const addressString = rowData[columnName];
 
