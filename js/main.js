@@ -912,7 +912,7 @@ class ExcelToCardsImporter {
         console.error('Trello API Error Response:', errorText);
         throw new Error(`Trello API error: ${response.status} - ${errorText}`);
       }
-      
+      console.log('Card creation response received.');
       const card = await response.json();
       console.log('Card created successfully:', card);
       
