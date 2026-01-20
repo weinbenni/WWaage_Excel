@@ -892,8 +892,33 @@ class ExcelToCardsImporter {
       
       if (cardData.location) {
         console.log('Location data found!')
-        params.append('address', cardData.location);
-        params.append('locationName', cardData.location);
+        
+        // Geocode the address using Nominatim (OpenStreetMap) - free, no API key needed
+        const geocodeUrl = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(cardData.location)}`;
+        
+        const geocodeResponse = await fetch(geocodeUrl, {
+          headers: {
+            'User-Agent': 'YourAppName/1.0' // Nominatim requires a User-Agent
+          }
+        });
+        
+        const geocodeData = await geocodeResponse.json();
+        
+        if (geocodeData && geocodeData.length > 0) {
+          const { lat, lon } = geocodeData[0];
+          
+          params.append('coordinates[latitude]', lat);
+          params.append('coordinates[longitude]', lon);
+          params.append('address', cardData.location);
+          params.append('locationName', cardData.location);
+          
+          console.log(`Geocoded "${cardData.location}" to lat: ${lat}, lon: ${lon}`);
+        } else {
+          console.warn(`Could not geocode address: ${cardData.location}`);
+          // Still add address/locationName even without coordinates
+          params.append('address', cardData.location);
+          params.append('locationName', cardData.location);
+        }
       }
 
       const url = `https://api.trello.com/1/cards?${params.toString()}`;
