@@ -10,15 +10,15 @@
   ],
   "connectors": {
     "iframe": {
-      "url": "https://weinbenni.github.io/trello-excel-powerup/index.html"
+      "url": "https://weinbenni.github.io/WWaage_Excel/index_powerup.html"
     }
   },
   "icon": {
-    "url": "https://weinbenni.github.io/trello-excel-powerup/assets/icon-light.svg"
+    "url": "https://weinbenni.github.io/WWaage_Excel/assets/icon-light.svg"
   },
   "categories": ["import", "productivity", "automation"],
-  "homepage": "https://weinbenni.github.io/trello-excel-powerup/",
-  "repository": "https://github.com/weinbenni/trello-excel-powerup",
-  "bugs": "https://github.com/weinbenni/trello-excel-powerup/issues",
+  "homepage": "https://weinbenni.github.io/WWaage_Excel/",
+  "repository": "https://github.com/weinbenni/WWaage_Excel",
+  "bugs": "https://github.com/weinbenni/WWaage_Excel/issues",
   "keywords": ["excel", "import", "cards", "automation", "productivity"]
 }
