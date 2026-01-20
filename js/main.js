@@ -888,8 +888,9 @@ class ExcelToCardsImporter {
       if (cardData.dueDate) {
         params.append('due', cardData.dueDate);
       }
-
+      
       if (cardData.location) {
+        console.log('Location data found!')
         params.append('address', cardData.location);
       }
 
@@ -898,7 +899,8 @@ class ExcelToCardsImporter {
       console.log('Attempting to create card:', {
         name: cardData.cardName,
         desc: cardData.description?.substring(0, 50) + '...',
-        listId: listId
+        listId: listId,
+        url: url
       });
 
       const response = await fetch(url, {
@@ -912,7 +914,7 @@ class ExcelToCardsImporter {
         console.error('Trello API Error Response:', errorText);
         throw new Error(`Trello API error: ${response.status} - ${errorText}`);
       }
-      console.log('Card creation response received.');
+      console.log('Card creation response received:');
       const card = await response.json();
       console.log('Card created successfully:', card);
       
