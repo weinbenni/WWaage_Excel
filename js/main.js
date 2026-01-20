@@ -932,7 +932,9 @@ class ExcelToCardsImporter {
         listId: listId,
         body: requestBody
       });
-
+      
+      console.log('Raw description:', requestBody.desc);
+      console.log('Description char codes:', [...requestBody.desc].map(c => c.charCodeAt(0)));
       const response = await fetch('https://api.trello.com/1/cards', {
         method: 'POST',
         headers: {
