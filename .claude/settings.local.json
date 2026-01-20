@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(start test_read_excel.html)",
+      "Bash(open:*)",
+      "Bash(xdg-open:*)"
+    ]
+  }
+}

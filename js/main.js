@@ -510,9 +510,8 @@ class ExcelToCardsImporter {
         items.push({
           text: `🏠 ${col} (Address)`,
           callback: (t) => {
-            // Show address component picker
-            this.showAddressComponentPicker(fieldId, col, event);
-            return t.closePopup();
+            // Show address component picker - don't close, let new popup replace
+            return this.showAddressComponentPicker(fieldId, col, event, t);
           }
         });
       } else {
@@ -533,7 +532,7 @@ class ExcelToCardsImporter {
     });
   }
 
-  showAddressComponentPicker(fieldId, columnName, event) {
+  showAddressComponentPicker(fieldId, columnName, event, t) {
     const components = [
       {
         text: '📊 Full Address',
@@ -572,7 +571,7 @@ class ExcelToCardsImporter {
       }
     ];
 
-    this.t.popup({
+    return t.popup({
       title: `Address Components: ${columnName}`,
       items: components,
       mouseEvent: event
@@ -900,6 +899,8 @@ class ExcelToCardsImporter {
         body: JSON.stringify(cardPayload)
       });
       
+      console.log('Trello API body sent:', JSON.stringify(cardPayload));
+
       if (!response.ok) {
         const errorText = await response.text();
         console.error('Trello API Error Response:', errorText);
@@ -1029,7 +1030,7 @@ class ExcelToCardsImporter {
       }
     });
   }
-  
+  f
   showImportResults(results) {
     const modal = document.createElement('div');
     modal.className = 'results-modal';
