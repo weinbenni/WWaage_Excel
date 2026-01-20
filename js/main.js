@@ -914,6 +914,7 @@ class ExcelToCardsImporter {
       }
       
       const card = await response.json();
+      console.log('Card created successfully:', card);
       
       // Add labels if specified
       if (cardData.labels && card.id) {
