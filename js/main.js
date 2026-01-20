@@ -927,6 +927,7 @@ class ExcelToCardsImporter {
         name: cardData.cardName,
         desc: cardData.description?.substring(0, 50) + '...',
         listId: listId,
+        params: params.toString(),
         url: url
       });
 
