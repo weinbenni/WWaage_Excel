@@ -795,6 +795,8 @@ class ExcelToCardsImporter {
       // Evaluate the expression
       // eslint-disable-next-line no-eval
       const result = eval(expression);
+      let finalResult = String(result || '');
+      finalResult = finalResult.split('\\n').join('\n');
       console.log('Evaluated syntax result:', result);
       return String(result || '');
     } catch (error) {
