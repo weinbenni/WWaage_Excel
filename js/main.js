@@ -884,7 +884,7 @@ class ExcelToCardsImporter {
         key: 'c9df6f6f1cd31f277375aa5dd43041c8',
         token: token,
         name: cardData.cardName,
-        desc: cardData.description || '',
+        desc: (cardData.description || '').replace(/\\n/g, '\n'),
         pos: 'bottom',
         idList: listId
       };
