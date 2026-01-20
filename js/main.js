@@ -874,6 +874,7 @@ class ExcelToCardsImporter {
         throw new Error('Failed to get authorization token. Please authorize the Power-Up.');
       }
       
+      console.log('Creating card with data:', cardData);
       // Build URL parameters (Trello API expects params in URL, not JSON body)
       const params = new URLSearchParams({
         key: 'c9df6f6f1cd31f277375aa5dd43041c8',
