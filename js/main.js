@@ -893,6 +893,7 @@ class ExcelToCardsImporter {
       if (cardData.location) {
         console.log('Location data found!')
         params.append('address', cardData.location);
+        params.append('locationName', cardData.location);
       }
 
       const url = `https://api.trello.com/1/cards?${params.toString()}`;
