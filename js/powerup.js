@@ -3,8 +3,8 @@ window.TrelloPowerUp.initialize({
   'board-buttons': function(t, options) {
     return [{
       icon: {
-        dark: './assets/icon-dark.svg',
-        light: './assets/icon-light.svg'
+        dark: 'https://weinbenni.github.io/WWaage_Excel/assets/icon-dark.svg',
+        light: 'https://weinbenni.github.io/WWaage_Excel/assets/icon-light.svg'
       },
       text: 'Import Excel',
       callback: function(t) {
@@ -21,8 +21,8 @@ window.TrelloPowerUp.initialize({
   'card-buttons': function(t, options) {
     return [{
       icon: {
-        dark: './assets/icon-dark.svg',
-        light: './assets/icon-light.svg'
+        dark: 'https://weinbenni.github.io/WWaage_Excel/assets/icon-dark.svg',
+        light: 'https://weinbenni.github.io/WWaage_Excel/assets/icon-light.svg'
       },
       text: 'Import Excel',
       callback: function(t) {
