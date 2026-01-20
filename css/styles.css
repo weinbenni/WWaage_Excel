@@ -259,11 +259,34 @@ body {
   margin-bottom: 30px;
 }
 
-.syntax-help h4 {
-  color: #F71635;
+.syntax-help-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.3s ease;
+}
+
+.syntax-help-header:hover {
+  opacity: 0.8;
+}
+
+.syntax-help-header.expanded {
   margin-bottom: 20px;
+}
+
+.syntax-help-header h4 {
+  color: #F71635;
+  margin: 0;
   font-size: 22px;
   font-weight: 600;
+}
+
+.toggle-icon {
+  font-size: 18px;
+  color: #F71635;
+  transition: transform 0.3s ease;
 }
 
 .syntax-examples {

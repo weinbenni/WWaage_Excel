@@ -89,8 +89,11 @@ class ExcelToCardsImporter {
   setupSyntaxHelp() {
     const helpContainer = document.getElementById('syntaxHelp');
     helpContainer.innerHTML = `
-      <h4>Syntax Help</h4>
-      <div class="syntax-examples">
+      <div class="syntax-help-header" id="syntaxHelpToggle">
+        <h4>Syntax Help</h4>
+        <span class="toggle-icon">▼</span>
+      </div>
+      <div class="syntax-examples" id="syntaxExamplesContent" style="display: none;">
         ${this.syntaxExamples.map(example => `
           <div class="syntax-example">
             <code>${example.syntax}</code>
@@ -99,6 +102,18 @@ class ExcelToCardsImporter {
         `).join('')}
       </div>
     `;
+
+    // Add click handler for toggle
+    const toggleBtn = document.getElementById('syntaxHelpToggle');
+    const content = document.getElementById('syntaxExamplesContent');
+    const icon = toggleBtn.querySelector('.toggle-icon');
+
+    toggleBtn.addEventListener('click', () => {
+      const isHidden = content.style.display === 'none';
+      content.style.display = isHidden ? 'block' : 'none';
+      icon.textContent = isHidden ? '▲' : '▼';
+      toggleBtn.classList.toggle('expanded', isHidden);
+    });
   }
 
   // Check if a column contains address data
@@ -284,20 +299,35 @@ class ExcelToCardsImporter {
   async processFile(file) {
     try {
       this.showLoading('Processing Excel file...');
-      
+
       const data = await this.readExcelFile(file);
       this.excelData = data;
       this.columns = Object.keys(data[0] || {});
       this.uploadedFileName = file.name;
-      
+
       if (this.columns.length === 0) {
         throw new Error('No data found in the Excel file');
       }
-      
+
+      // Debug: Output first 5 rows to console
+      console.log('=== EXCEL DATA DEBUG ===');
+      console.log('File:', file.name);
+      console.log('Total rows:', data.length);
+      console.log('Columns:', this.columns);
+      console.log('\nFirst 5 rows:');
+      data.slice(0, 5).forEach((row, index) => {
+        console.log(`\nRow ${index + 1}:`, row);
+        // Also log each column value separately for easier inspection
+        Object.entries(row).forEach(([key, value]) => {
+          console.log(`  ${key}: "${value}"`);
+        });
+      });
+      console.log('=== END DEBUG ===\n');
+
       this.showFileInfo(file.name, data.length, this.columns.length);
       this.renderFieldMappings();
       this.showSuccess(`File processed successfully! Found ${data.length} rows and ${this.columns.length} columns.`);
-      
+
     } catch (error) {
       console.error('File processing error:', error);
       this.showError(`Error processing file: ${error.message}`);
