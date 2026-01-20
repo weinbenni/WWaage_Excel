@@ -874,32 +874,37 @@ class ExcelToCardsImporter {
         throw new Error('Failed to get authorization token. Please authorize the Power-Up.');
       }
       
-      // Build the card payload
-      const cardPayload = {
+      // Build URL parameters (Trello API expects params in URL, not JSON body)
+      const params = new URLSearchParams({
+        key: 'c9df6f6f1cd31f277375aa5dd43041c8',
+        token: token,
         name: cardData.cardName,
         desc: cardData.description || '',
         pos: 'bottom',
         idList: listId
-      };
-      
-      if (cardData.dueDate) {
-        cardPayload.due = cardData.dueDate;
-      }
-      
-      // Key and token go in the URL as query parameters
-      const url = `https://api.trello.com/1/cards?key=c9df6f6f1cd31f277375aa5dd43041c8&token=${token}`;
-      
-      console.log('Attempting to create card with URL:', url.replace(token, 'TOKEN_HIDDEN'));
-      
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(cardPayload)
       });
-      
-      console.log('Trello API body sent:', JSON.stringify(cardPayload));
+
+      if (cardData.dueDate) {
+        params.append('due', cardData.dueDate);
+      }
+
+      if (cardData.location) {
+        params.append('address', cardData.location);
+      }
+
+      const url = `https://api.trello.com/1/cards?${params.toString()}`;
+
+      console.log('Attempting to create card:', {
+        name: cardData.cardName,
+        desc: cardData.description?.substring(0, 50) + '...',
+        listId: listId
+      });
+
+      const response = await fetch(url, {
+        method: 'POST'
+      });
+
+      console.log('Trello API Response Status:', response.status);
 
       if (!response.ok) {
         const errorText = await response.text();
