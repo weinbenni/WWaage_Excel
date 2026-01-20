@@ -876,18 +876,19 @@ class ExcelToCardsImporter {
       }
       
       console.log('Creating card with data:', cardData);
-      // Build URL parameters (Trello API expects params in URL, not JSON body)
-      const params = new URLSearchParams({
+      
+      // Build the request body
+      const requestBody = {
         key: 'c9df6f6f1cd31f277375aa5dd43041c8',
         token: token,
         name: cardData.cardName,
         desc: cardData.description || '',
         pos: 'bottom',
         idList: listId
-      });
+      };
 
       if (cardData.dueDate) {
-        params.append('due', cardData.dueDate);
+        requestBody.due = cardData.dueDate;
       }
       
       if (cardData.location) {
@@ -898,7 +899,7 @@ class ExcelToCardsImporter {
         
         const geocodeResponse = await fetch(geocodeUrl, {
           headers: {
-            'User-Agent': 'YourAppName/1.0' // Nominatim requires a User-Agent
+            'User-Agent': 'WWaage/1.0'
           }
         });
         
@@ -907,32 +908,35 @@ class ExcelToCardsImporter {
         if (geocodeData && geocodeData.length > 0) {
           const { lat, lon } = geocodeData[0];
           
-          params.append('coordinates[latitude]', lat);
-          params.append('coordinates[longitude]', lon);
-          params.append('address', cardData.location);
-          params.append('locationName', cardData.location);
+          requestBody.coordinates = {
+            latitude: parseFloat(lat),
+            longitude: parseFloat(lon)
+          };
+          requestBody.locationName = cardData.location;
+          requestBody.address = cardData.location;
           
           console.log(`Geocoded "${cardData.location}" to lat: ${lat}, lon: ${lon}`);
         } else {
           console.warn(`Could not geocode address: ${cardData.location}`);
           // Still add address/locationName even without coordinates
-          params.append('address', cardData.location);
-          params.append('locationName', cardData.location);
+          requestBody.address = cardData.location;
+          requestBody.locationName = cardData.location;
         }
       }
-
-      const url = `https://api.trello.com/1/cards?${params.toString()}`;
 
       console.log('Attempting to create card:', {
         name: cardData.cardName,
         desc: cardData.description?.substring(0, 50) + '...',
         listId: listId,
-        params: params.toString(),
-        url: url
+        body: requestBody
       });
 
-      const response = await fetch(url, {
-        method: 'POST'
+      const response = await fetch('https://api.trello.com/1/cards', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
       });
 
       console.log('Trello API Response Status:', response.status);
