@@ -640,8 +640,12 @@ class AttachmentDownloader {
 
         for (const attachment of card.attachments) {
           try {
-            // Download attachment
-            const blob = await this.downloadAttachment(attachment.url);
+            // Download attachment with card and attachment IDs for API fallback
+            const attachmentInfo = {
+              id: attachment.id,
+              cardId: card.id
+            };
+            const blob = await this.downloadAttachment(attachment.url, attachmentInfo);
 
             // Add to ZIP
             const fileName = this.sanitizeFileName(attachment.name);
@@ -825,18 +829,101 @@ class AttachmentDownloader {
     return cardsWithAttachments;
   }
 
-  async downloadAttachment(url) {
+  async downloadAttachment(url, attachmentId = null) {
     const startTime = performance.now();
     try {
-      const response = await fetch(url);
+      this.debug.log(`Attempting to download from: ${url}`, 'info');
 
-      if (!response.ok) {
-        const duration = performance.now() - startTime;
-        this.debug.logAPI('GET', url, response.status, duration);
-        throw new Error(`HTTP error! status: ${response.status}`);
+      // Try multiple download strategies
+      let blob = null;
+      let response = null;
+
+      // Strategy 1: Try direct fetch with CORS mode
+      try {
+        response = await fetch(url, {
+          mode: 'cors',
+          credentials: 'omit',
+          headers: {
+            'Accept': '*/*'
+          }
+        });
+
+        if (response.ok) {
+          blob = await response.blob();
+          this.debug.log('Strategy 1 (direct CORS) succeeded', 'success');
+        }
+      } catch (e) {
+        this.debug.log(`Strategy 1 failed: ${e.message}`, 'warning');
       }
 
-      const blob = await response.blob();
+      // Strategy 2: If direct fetch failed, try with no-cors mode (will get opaque response)
+      if (!blob) {
+        try {
+          response = await fetch(url, {
+            mode: 'no-cors'
+          });
+
+          blob = await response.blob();
+
+          // Check if we got a valid blob (no-cors gives opaque response with 0 size)
+          if (blob.size === 0) {
+            this.debug.log('Strategy 2 (no-cors) returned empty blob', 'warning');
+            blob = null;
+          } else {
+            this.debug.log('Strategy 2 (no-cors) succeeded', 'success');
+          }
+        } catch (e) {
+          this.debug.log(`Strategy 2 failed: ${e.message}`, 'warning');
+        }
+      }
+
+      // Strategy 3: Try to download via Trello API if we have attachment ID
+      if (!blob && attachmentId) {
+        try {
+          const token = await this.t.getRestApi().getToken();
+          const apiUrl = `https://api.trello.com/1/cards/${attachmentId.cardId}/attachments/${attachmentId.id}/download?key=${APP_KEY}&token=${token}`;
+
+          response = await fetch(apiUrl, {
+            mode: 'cors',
+            credentials: 'omit'
+          });
+
+          if (response.ok) {
+            blob = await response.blob();
+            this.debug.log('Strategy 3 (API download) succeeded', 'success');
+          }
+        } catch (e) {
+          this.debug.log(`Strategy 3 failed: ${e.message}`, 'warning');
+        }
+      }
+
+      // Strategy 4: Try appending token to original URL
+      if (!blob) {
+        try {
+          const token = await this.t.getRestApi().getToken();
+          const separator = url.includes('?') ? '&' : '?';
+          const authenticatedUrl = `${url}${separator}key=${APP_KEY}&token=${token}`;
+
+          response = await fetch(authenticatedUrl, {
+            mode: 'cors',
+            credentials: 'omit'
+          });
+
+          if (response.ok) {
+            blob = await response.blob();
+            this.debug.log('Strategy 4 (authenticated URL) succeeded', 'success');
+          }
+        } catch (e) {
+          this.debug.log(`Strategy 4 failed: ${e.message}`, 'warning');
+        }
+      }
+
+      if (!blob || blob.size === 0) {
+        const duration = performance.now() - startTime;
+        this.debug.logAPI('GET', url, response?.status || 0, duration);
+        throw new Error('All download strategies failed - CORS or authentication issue');
+      }
+
       const duration = performance.now() - startTime;
       const sizeKB = (blob.size / 1024).toFixed(2);
       this.debug.logAPI('GET', url, response.status, duration, { size: `${sizeKB} KB` });
