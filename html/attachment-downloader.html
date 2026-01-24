@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Attachment Downloader</title>
+    <link href="https://fonts.googleapis.com/css2?family=Duru+Sans&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="../css/styles.css">
+    <link rel="stylesheet" href="../css/attachment-downloader.css">
+</head>
+<body>
+    <div class="downloader-container">
+        <div class="downloader-header">
+            <h2>📎 Download Attachments</h2>
+            <p id="sourceDescription">Select cards to download attachments from</p>
+        </div>
+
+        <!-- Source Selection (only shown for board source) -->
+        <div id="sourceSelection" class="source-section">
+            <label for="listSelect">Download from:</label>
+            <select id="listSelect">
+                <option value="all">Entire Board</option>
+                <!-- Lists populated dynamically -->
+            </select>
+        </div>
+
+        <!-- Download Button -->
+        <div class="action-section">
+            <button id="downloadBtn" class="btn btn-primary">
+                📥 Download Attachments
+            </button>
+        </div>
+
+        <!-- Progress Section -->
+        <div id="progressSection" style="display: none;">
+            <div class="progress-bar">
+                <div id="progressFill" class="progress-fill"></div>
+            </div>
+            <p id="progressText">Preparing download...</p>
+        </div>
+
+        <!-- Status Messages -->
+        <div id="statusSection"></div>
+    </div>
+
+    <!-- Include JSZip and FileSaver -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <script src="https://p.trellocdn.com/power-up.min.js"></script>
+    <script src="../js/attachment-downloader.js"></script>
+</body>
+</html>
