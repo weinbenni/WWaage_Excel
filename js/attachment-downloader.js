@@ -1,6 +1,9 @@
 // Attachment Downloader - Trello Power-Up Feature
-const t = window.TrelloPowerUp.iframe();
 const APP_KEY = 'c9df6f6f1cd31f277375aa5dd43041c8';
+const t = window.TrelloPowerUp.iframe({
+  appKey: APP_KEY,
+  appName: 'Weinhäupl Attachment Downloader'
+});
 
 // Advanced Debug Logger
 class DebugLogger {
