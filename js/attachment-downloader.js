@@ -2,6 +2,432 @@
 const t = window.TrelloPowerUp.iframe();
 const APP_KEY = 'c9df6f6f1cd31f277375aa5dd43041c8';
 
+// Advanced Debug Logger
+class DebugLogger {
+  constructor() {
+    this.logs = [];
+    this.enabled = false;
+    this.startTime = Date.now();
+    this.apiCalls = [];
+    this.performance = {};
+    this.stateSnapshots = [];
+    this.maxLogs = 1000;
+
+    // Check for debug mode in URL
+    const urlParams = new URLSearchParams(window.location.search);
+    this.enabled = urlParams.get('debug') === 'true';
+
+    if (this.enabled) {
+      this.log('DEBUG MODE ENABLED', 'system');
+      this.initDebugPanel();
+    }
+
+    // Keyboard shortcut: Ctrl+Shift+D to toggle debug panel
+    document.addEventListener('keydown', (e) => {
+      if (e.ctrlKey && e.shiftKey && e.key === 'D') {
+        this.toggleDebugPanel();
+      }
+    });
+  }
+
+  log(message, category = 'info', data = null) {
+    const timestamp = Date.now() - this.startTime;
+    const logEntry = {
+      timestamp,
+      time: new Date().toISOString(),
+      category,
+      message,
+      data: data ? JSON.parse(JSON.stringify(data)) : null
+    };
+
+    this.logs.push(logEntry);
+
+    // Limit log size
+    if (this.logs.length > this.maxLogs) {
+      this.logs.shift();
+    }
+
+    if (this.enabled) {
+      const style = this.getCategoryStyle(category);
+      console.log(
+        `%c[${timestamp}ms] [${category.toUpperCase()}] ${message}`,
+        style,
+        data || ''
+      );
+      this.updateDebugPanel();
+    }
+  }
+
+  getCategoryStyle(category) {
+    const styles = {
+      system: 'color: #F71635; font-weight: bold;',
+      api: 'color: #17a2b8; font-weight: bold;',
+      error: 'color: #dc3545; font-weight: bold;',
+      warning: 'color: #ffc107; font-weight: bold;',
+      success: 'color: #28a745; font-weight: bold;',
+      performance: 'color: #8300E9; font-weight: bold;',
+      info: 'color: #6c757d;'
+    };
+    return styles[category] || styles.info;
+  }
+
+  logAPI(method, url, status, duration, response = null) {
+    const apiCall = {
+      timestamp: Date.now() - this.startTime,
+      method,
+      url,
+      status,
+      duration,
+      response: response ? JSON.parse(JSON.stringify(response)) : null
+    };
+
+    this.apiCalls.push(apiCall);
+    this.log(`${method} ${url} - ${status} (${duration}ms)`, 'api', { status, duration });
+  }
+
+  trackPerformance(operation, duration) {
+    if (!this.performance[operation]) {
+      this.performance[operation] = {
+        count: 0,
+        totalTime: 0,
+        avgTime: 0,
+        minTime: Infinity,
+        maxTime: 0
+      };
+    }
+
+    const perf = this.performance[operation];
+    perf.count++;
+    perf.totalTime += duration;
+    perf.avgTime = perf.totalTime / perf.count;
+    perf.minTime = Math.min(perf.minTime, duration);
+    perf.maxTime = Math.max(perf.maxTime, duration);
+
+    this.log(`Performance: ${operation} completed in ${duration}ms`, 'performance', perf);
+  }
+
+  snapshot(label, state) {
+    const snapshot = {
+      timestamp: Date.now() - this.startTime,
+      label,
+      state: JSON.parse(JSON.stringify(state))
+    };
+    this.stateSnapshots.push(snapshot);
+    this.log(`State snapshot: ${label}`, 'info', state);
+  }
+
+  initDebugPanel() {
+    const panel = document.createElement('div');
+    panel.id = 'debugPanel';
+    panel.innerHTML = `
+      <div class="debug-header">
+        <h3>🐛 Debug Console</h3>
+        <div class="debug-controls">
+          <button id="debugClear" title="Clear logs">🗑️</button>
+          <button id="debugExport" title="Export logs">💾</button>
+          <button id="debugToggle" title="Minimize">➖</button>
+        </div>
+      </div>
+      <div class="debug-tabs">
+        <button class="debug-tab active" data-tab="logs">Logs</button>
+        <button class="debug-tab" data-tab="api">API Calls</button>
+        <button class="debug-tab" data-tab="performance">Performance</button>
+        <button class="debug-tab" data-tab="state">State</button>
+      </div>
+      <div class="debug-content">
+        <div id="debugLogs" class="debug-tab-content active"></div>
+        <div id="debugAPI" class="debug-tab-content"></div>
+        <div id="debugPerformance" class="debug-tab-content"></div>
+        <div id="debugState" class="debug-tab-content"></div>
+      </div>
+    `;
+    document.body.appendChild(panel);
+
+    // Add CSS
+    this.injectDebugStyles();
+
+    // Event listeners
+    document.getElementById('debugClear').addEventListener('click', () => this.clearLogs());
+    document.getElementById('debugExport').addEventListener('click', () => this.exportLogs());
+    document.getElementById('debugToggle').addEventListener('click', () => this.minimizePanel());
+
+    // Tab switching
+    document.querySelectorAll('.debug-tab').forEach(tab => {
+      tab.addEventListener('click', (e) => {
+        const tabName = e.target.dataset.tab;
+        this.switchTab(tabName);
+      });
+    });
+  }
+
+  injectDebugStyles() {
+    const style = document.createElement('style');
+    style.textContent = `
+      #debugPanel {
+        position: fixed;
+        bottom: 0;
+        right: 0;
+        width: 450px;
+        max-height: 60vh;
+        background: #1a1a1a;
+        border: 2px solid #F71635;
+        border-radius: 8px 0 0 0;
+        color: #ffffff;
+        font-family: 'Courier New', monospace;
+        font-size: 11px;
+        z-index: 10000;
+        display: flex;
+        flex-direction: column;
+        box-shadow: 0 -4px 20px rgba(247, 22, 53, 0.3);
+      }
+      #debugPanel.minimized .debug-tabs,
+      #debugPanel.minimized .debug-content {
+        display: none;
+      }
+      .debug-header {
+        background: #F71635;
+        padding: 8px 12px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-radius: 6px 0 0 0;
+      }
+      .debug-header h3 {
+        margin: 0;
+        font-size: 14px;
+        font-weight: 600;
+      }
+      .debug-controls button {
+        background: none;
+        border: none;
+        color: white;
+        cursor: pointer;
+        font-size: 16px;
+        margin-left: 8px;
+        padding: 4px;
+        opacity: 0.8;
+        transition: opacity 0.2s;
+      }
+      .debug-controls button:hover {
+        opacity: 1;
+      }
+      .debug-tabs {
+        display: flex;
+        background: #2a2a2a;
+        border-bottom: 1px solid #444;
+      }
+      .debug-tab {
+        flex: 1;
+        background: none;
+        border: none;
+        color: #999;
+        padding: 8px;
+        cursor: pointer;
+        transition: all 0.2s;
+        font-size: 11px;
+      }
+      .debug-tab:hover {
+        background: #333;
+        color: #fff;
+      }
+      .debug-tab.active {
+        background: #1a1a1a;
+        color: #F71635;
+        border-bottom: 2px solid #F71635;
+      }
+      .debug-content {
+        flex: 1;
+        overflow-y: auto;
+        padding: 8px;
+        max-height: calc(60vh - 100px);
+      }
+      .debug-tab-content {
+        display: none;
+      }
+      .debug-tab-content.active {
+        display: block;
+      }
+      .debug-log-entry {
+        padding: 4px 6px;
+        margin: 2px 0;
+        border-left: 3px solid;
+        background: #222;
+        font-size: 10px;
+        line-height: 1.4;
+      }
+      .debug-log-entry.system { border-color: #F71635; }
+      .debug-log-entry.api { border-color: #17a2b8; }
+      .debug-log-entry.error { border-color: #dc3545; }
+      .debug-log-entry.warning { border-color: #ffc107; }
+      .debug-log-entry.success { border-color: #28a745; }
+      .debug-log-entry.performance { border-color: #8300E9; }
+      .debug-log-entry.info { border-color: #6c757d; }
+      .debug-log-time {
+        color: #666;
+        font-size: 9px;
+      }
+      .debug-log-message {
+        color: #fff;
+      }
+      .debug-log-data {
+        color: #999;
+        margin-top: 2px;
+        font-size: 9px;
+        max-height: 100px;
+        overflow: auto;
+      }
+      .debug-metric {
+        background: #222;
+        padding: 8px;
+        margin: 4px 0;
+        border-radius: 4px;
+      }
+      .debug-metric-label {
+        color: #F71635;
+        font-weight: bold;
+      }
+      .debug-metric-value {
+        color: #fff;
+        margin-left: 8px;
+      }
+    `;
+    document.head.appendChild(style);
+  }
+
+  updateDebugPanel() {
+    if (!this.enabled) return;
+
+    // Update logs tab
+    const logsContainer = document.getElementById('debugLogs');
+    if (logsContainer) {
+      logsContainer.innerHTML = this.logs.slice(-100).reverse().map(log => `
+        <div class="debug-log-entry ${log.category}">
+          <div class="debug-log-time">[${log.timestamp}ms] ${log.time}</div>
+          <div class="debug-log-message">${log.message}</div>
+          ${log.data ? `<div class="debug-log-data">${JSON.stringify(log.data, null, 2)}</div>` : ''}
+        </div>
+      `).join('');
+    }
+
+    // Update API tab
+    const apiContainer = document.getElementById('debugAPI');
+    if (apiContainer) {
+      apiContainer.innerHTML = this.apiCalls.slice(-50).reverse().map(call => `
+        <div class="debug-log-entry api">
+          <div class="debug-log-time">[${call.timestamp}ms]</div>
+          <div class="debug-log-message">${call.method} ${call.url}</div>
+          <div class="debug-log-data">Status: ${call.status} | Duration: ${call.duration}ms</div>
+        </div>
+      `).join('');
+    }
+
+    // Update performance tab
+    const perfContainer = document.getElementById('debugPerformance');
+    if (perfContainer) {
+      perfContainer.innerHTML = Object.entries(this.performance).map(([op, perf]) => `
+        <div class="debug-metric">
+          <div class="debug-metric-label">${op}</div>
+          <div class="debug-metric-value">
+            Count: ${perf.count} |
+            Avg: ${perf.avgTime.toFixed(2)}ms |
+            Min: ${perf.minTime.toFixed(2)}ms |
+            Max: ${perf.maxTime.toFixed(2)}ms
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // Update state tab
+    const stateContainer = document.getElementById('debugState');
+    if (stateContainer) {
+      stateContainer.innerHTML = this.stateSnapshots.slice(-20).reverse().map(snap => `
+        <div class="debug-metric">
+          <div class="debug-metric-label">[${snap.timestamp}ms] ${snap.label}</div>
+          <div class="debug-log-data">${JSON.stringify(snap.state, null, 2)}</div>
+        </div>
+      `).join('');
+    }
+  }
+
+  switchTab(tabName) {
+    // Update tabs
+    document.querySelectorAll('.debug-tab').forEach(tab => {
+      tab.classList.toggle('active', tab.dataset.tab === tabName);
+    });
+
+    // Update content
+    const contentMap = {
+      logs: 'debugLogs',
+      api: 'debugAPI',
+      performance: 'debugPerformance',
+      state: 'debugState'
+    };
+
+    document.querySelectorAll('.debug-tab-content').forEach(content => {
+      content.classList.remove('active');
+    });
+
+    const activeContent = document.getElementById(contentMap[tabName]);
+    if (activeContent) {
+      activeContent.classList.add('active');
+    }
+  }
+
+  toggleDebugPanel() {
+    if (!this.enabled) {
+      this.enabled = true;
+      this.log('Debug mode enabled via keyboard shortcut', 'system');
+      this.initDebugPanel();
+    } else {
+      const panel = document.getElementById('debugPanel');
+      if (panel) {
+        panel.style.display = panel.style.display === 'none' ? 'flex' : 'none';
+      }
+    }
+  }
+
+  minimizePanel() {
+    const panel = document.getElementById('debugPanel');
+    if (panel) {
+      panel.classList.toggle('minimized');
+      const btn = document.getElementById('debugToggle');
+      btn.textContent = panel.classList.contains('minimized') ? '➕' : '➖';
+    }
+  }
+
+  clearLogs() {
+    this.logs = [];
+    this.apiCalls = [];
+    this.stateSnapshots = [];
+    this.updateDebugPanel();
+    this.log('Logs cleared', 'system');
+  }
+
+  exportLogs() {
+    const exportData = {
+      timestamp: new Date().toISOString(),
+      duration: Date.now() - this.startTime,
+      logs: this.logs,
+      apiCalls: this.apiCalls,
+      performance: this.performance,
+      stateSnapshots: this.stateSnapshots
+    };
+
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `attachment-downloader-debug-${Date.now()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+
+    this.log('Debug logs exported', 'success');
+  }
+}
+
+// Global debug logger instance
+const debugLogger = new DebugLogger();
+
 class AttachmentDownloader {
   constructor() {
     this.t = t;
@@ -9,19 +435,25 @@ class AttachmentDownloader {
     this.boardId = null;
     this.cardId = null;
     this.lists = [];
+    this.debug = debugLogger;
     this.init();
   }
 
   async init() {
+    const startTime = performance.now();
     try {
+      this.debug.log('Initializing Attachment Downloader', 'system');
+
       // Determine source from URL params
       const urlParams = new URLSearchParams(window.location.search);
       this.source = urlParams.get('source') || 'board';
+      this.debug.log(`Source determined: ${this.source}`, 'info');
 
       // Get context
       const context = await this.t.getContext();
       this.boardId = context.board;
       this.cardId = context.card;
+      this.debug.snapshot('Initial Context', { boardId: this.boardId, cardId: this.cardId, source: this.source });
 
       // Update UI based on source
       this.updateUIForSource();
@@ -33,8 +465,13 @@ class AttachmentDownloader {
 
       // Set up event listeners
       this.setupEventListeners();
+
+      const duration = performance.now() - startTime;
+      this.debug.trackPerformance('init', duration);
+      this.debug.log('Initialization complete', 'success');
     } catch (error) {
       console.error('Initialization error:', error);
+      this.debug.log(`Initialization failed: ${error.message}`, 'error', error);
       this.showStatus('Failed to initialize downloader', 'error');
     }
   }
@@ -53,20 +490,32 @@ class AttachmentDownloader {
   }
 
   async loadLists() {
+    const startTime = performance.now();
     try {
+      this.debug.log('Loading board lists', 'info');
       const token = await this.t.getRestApi().getToken();
-      const response = await fetch(
-        `https://api.trello.com/1/boards/${this.boardId}/lists?key=${APP_KEY}&token=${token}`
-      );
+      const url = `https://api.trello.com/1/boards/${this.boardId}/lists?key=${APP_KEY}&token=${token}`;
+
+      const apiStart = performance.now();
+      const response = await fetch(url);
+      const apiDuration = performance.now() - apiStart;
 
       if (!response.ok) {
+        this.debug.logAPI('GET', url, response.status, apiDuration);
         throw new Error('Failed to load lists');
       }
 
       this.lists = await response.json();
+      this.debug.logAPI('GET', url, response.status, apiDuration, { count: this.lists.length });
+      this.debug.log(`Loaded ${this.lists.length} lists`, 'success');
+
       this.populateListSelector();
+
+      const duration = performance.now() - startTime;
+      this.debug.trackPerformance('loadLists', duration);
     } catch (error) {
       console.error('Error loading lists:', error);
+      this.debug.log(`Failed to load lists: ${error.message}`, 'error', error);
       this.showStatus('Failed to load board lists', 'error');
     }
   }
@@ -89,12 +538,30 @@ class AttachmentDownloader {
   setupEventListeners() {
     const downloadBtn = document.getElementById('downloadBtn');
     downloadBtn.addEventListener('click', () => this.handleDownload());
+
+    // Debug toggle button
+    const debugToggleBtn = document.getElementById('debugToggleBtn');
+    if (debugToggleBtn) {
+      debugToggleBtn.addEventListener('click', () => {
+        this.debug.toggleDebugPanel();
+        debugToggleBtn.classList.toggle('active', this.debug.enabled);
+      });
+
+      // Set initial state
+      if (this.debug.enabled) {
+        debugToggleBtn.classList.add('active');
+      }
+    }
   }
 
   async handleDownload() {
+    const downloadStartTime = performance.now();
     const downloadBtn = document.getElementById('downloadBtn');
     const progressSection = document.getElementById('progressSection');
     const statusSection = document.getElementById('statusSection');
+
+    this.debug.log('=== DOWNLOAD STARTED ===', 'system');
+    this.debug.snapshot('Download Start', { source: this.source, boardId: this.boardId, cardId: this.cardId });
 
     // Reset UI
     statusSection.innerHTML = '';
@@ -113,7 +580,10 @@ class AttachmentDownloader {
         cards = await this.getCardsFromBoard();
       }
 
+      this.debug.log(`Retrieved ${cards.length} cards`, 'info', { cardIds: cards.map(c => c.id) });
+
       if (cards.length === 0) {
+        this.debug.log('No cards found', 'warning');
         this.showStatus('No cards found', 'warning');
         downloadBtn.disabled = false;
         progressSection.style.display = 'none';
@@ -130,7 +600,10 @@ class AttachmentDownloader {
         card.attachments && card.attachments.length > 0
       );
 
+      this.debug.log(`${cardsToDownload.length} cards have attachments`, 'info');
+
       if (cardsToDownload.length === 0) {
+        this.debug.log('No attachments found', 'warning');
         this.showStatus('No attachments found in selected cards', 'info');
         downloadBtn.disabled = false;
         progressSection.style.display = 'none';
@@ -142,15 +615,25 @@ class AttachmentDownloader {
         0
       );
 
+      this.debug.log(`Total attachments to download: ${totalAttachments}`, 'info');
+      this.debug.snapshot('Pre-Download State', {
+        cardsToDownload: cardsToDownload.length,
+        totalAttachments,
+        cards: cardsToDownload.map(c => ({ name: c.name, attachments: c.attachments.length }))
+      });
+
       this.updateProgress(40, `Found ${totalAttachments} attachment(s). Downloading...`);
 
       // Create ZIP file
+      const zipStartTime = performance.now();
       const zip = new JSZip();
       let downloadedCount = 0;
+      let failedCount = 0;
 
       for (const card of cardsToDownload) {
         const cardFolderName = this.sanitizeFileName(card.name);
         const cardFolder = zip.folder(cardFolderName);
+        this.debug.log(`Processing card: ${card.name}`, 'info', { attachments: card.attachments.length });
 
         for (const attachment of card.attachments) {
           try {
@@ -167,8 +650,11 @@ class AttachmentDownloader {
               progress,
               `Downloading ${downloadedCount}/${totalAttachments} attachments...`
             );
+            this.debug.log(`Downloaded: ${attachment.name} (${downloadedCount}/${totalAttachments})`, 'success');
           } catch (error) {
+            failedCount++;
             console.error(`Failed to download ${attachment.name}:`, error);
+            this.debug.log(`Failed to download: ${attachment.name}`, 'error', error);
             this.showStatus(`Failed to download: ${attachment.name}`, 'warning');
           }
         }
@@ -176,7 +662,11 @@ class AttachmentDownloader {
 
       // Generate and save ZIP
       this.updateProgress(95, 'Creating ZIP file...');
+      this.debug.log('Generating ZIP file...', 'info');
       const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const zipDuration = performance.now() - zipStartTime;
+      this.debug.trackPerformance('zipGeneration', zipDuration);
+      this.debug.log(`ZIP file created: ${(zipBlob.size / 1024 / 1024).toFixed(2)} MB`, 'success');
 
       // Download ZIP
       const zipFileName = this.source === 'card'
@@ -187,6 +677,18 @@ class AttachmentDownloader {
 
       // Success
       this.updateProgress(100, 'Download complete!');
+      const totalDuration = performance.now() - downloadStartTime;
+      this.debug.trackPerformance('fullDownload', totalDuration);
+
+      this.debug.log('=== DOWNLOAD COMPLETE ===', 'system', {
+        totalCards: cardsToDownload.length,
+        totalAttachments,
+        downloaded: downloadedCount,
+        failed: failedCount,
+        zipSize: `${(zipBlob.size / 1024 / 1024).toFixed(2)} MB`,
+        duration: `${(totalDuration / 1000).toFixed(2)}s`
+      });
+
       this.showStatus(
         `✅ Successfully downloaded ${downloadedCount} attachments from ${cardsToDownload.length} card(s)`,
         'success'
@@ -198,6 +700,7 @@ class AttachmentDownloader {
 
     } catch (error) {
       console.error('Download error:', error);
+      this.debug.log(`DOWNLOAD FAILED: ${error.message}`, 'error', error);
       this.showStatus(`Error: ${error.message}`, 'error');
       progressSection.style.display = 'none';
     } finally {
@@ -206,28 +709,42 @@ class AttachmentDownloader {
   }
 
   async getCardsFromCard() {
+    const startTime = performance.now();
     try {
+      this.debug.log(`Fetching single card: ${this.cardId}`, 'info');
       const token = await this.t.getRestApi().getToken();
-      const response = await fetch(
-        `https://api.trello.com/1/cards/${this.cardId}?key=${APP_KEY}&token=${token}`
-      );
+      const url = `https://api.trello.com/1/cards/${this.cardId}?key=${APP_KEY}&token=${token}`;
+
+      const apiStart = performance.now();
+      const response = await fetch(url);
+      const apiDuration = performance.now() - apiStart;
 
       if (!response.ok) {
+        this.debug.logAPI('GET', url, response.status, apiDuration);
         throw new Error('Failed to fetch card');
       }
 
       const card = await response.json();
+      this.debug.logAPI('GET', url, response.status, apiDuration, { cardName: card.name });
+      this.debug.log(`Card fetched: ${card.name}`, 'success');
+
+      const duration = performance.now() - startTime;
+      this.debug.trackPerformance('getCardsFromCard', duration);
       return [card];
     } catch (error) {
       console.error('Error fetching card:', error);
+      this.debug.log(`Failed to fetch card: ${error.message}`, 'error', error);
       throw error;
     }
   }
 
   async getCardsFromBoard() {
+    const startTime = performance.now();
     try {
       const listSelect = document.getElementById('listSelect');
       const selectedListId = listSelect.value;
+
+      this.debug.log(`Fetching cards from ${selectedListId === 'all' ? 'entire board' : 'list ' + selectedListId}`, 'info');
 
       const token = await this.t.getRestApi().getToken();
       let url;
@@ -240,59 +757,92 @@ class AttachmentDownloader {
         url = `https://api.trello.com/1/lists/${selectedListId}/cards?key=${APP_KEY}&token=${token}`;
       }
 
+      const apiStart = performance.now();
       const response = await fetch(url);
+      const apiDuration = performance.now() - apiStart;
 
       if (!response.ok) {
+        this.debug.logAPI('GET', url, response.status, apiDuration);
         throw new Error('Failed to fetch cards');
       }
 
       const cards = await response.json();
+      this.debug.logAPI('GET', url, response.status, apiDuration, { count: cards.length });
+      this.debug.log(`Fetched ${cards.length} cards`, 'success');
+
+      const duration = performance.now() - startTime;
+      this.debug.trackPerformance('getCardsFromBoard', duration);
       return cards;
     } catch (error) {
       console.error('Error fetching cards:', error);
+      this.debug.log(`Failed to fetch cards: ${error.message}`, 'error', error);
       throw error;
     }
   }
 
   async fetchAttachmentsForCards(cards) {
+    const startTime = performance.now();
+    this.debug.log(`Fetching attachments for ${cards.length} cards`, 'info');
+
     const token = await this.t.getRestApi().getToken();
 
     const cardsWithAttachments = await Promise.all(
       cards.map(async (card) => {
         try {
-          const response = await fetch(
-            `https://api.trello.com/1/cards/${card.id}/attachments?key=${APP_KEY}&token=${token}`
-          );
+          const url = `https://api.trello.com/1/cards/${card.id}/attachments?key=${APP_KEY}&token=${token}`;
+          const apiStart = performance.now();
+          const response = await fetch(url);
+          const apiDuration = performance.now() - apiStart;
 
           if (!response.ok) {
             console.error(`Failed to fetch attachments for card ${card.id}`);
+            this.debug.logAPI('GET', url, response.status, apiDuration);
+            this.debug.log(`No attachments for card: ${card.name}`, 'warning');
             return { ...card, attachments: [] };
           }
 
           const attachments = await response.json();
+          this.debug.logAPI('GET', url, response.status, apiDuration, { count: attachments.length });
+          this.debug.log(`Card "${card.name}": ${attachments.length} attachment(s)`, 'info');
           return { ...card, attachments };
         } catch (error) {
           console.error(`Error fetching attachments for card ${card.id}:`, error);
+          this.debug.log(`Error fetching attachments for card ${card.name}: ${error.message}`, 'error', error);
           return { ...card, attachments: [] };
         }
       })
     );
 
+    const duration = performance.now() - startTime;
+    this.debug.trackPerformance('fetchAttachmentsForCards', duration);
+
+    const totalAttachments = cardsWithAttachments.reduce((sum, c) => sum + c.attachments.length, 0);
+    this.debug.log(`Fetched ${totalAttachments} total attachments from ${cards.length} cards`, 'success');
+
     return cardsWithAttachments;
   }
 
   async downloadAttachment(url) {
+    const startTime = performance.now();
     try {
       const response = await fetch(url);
 
       if (!response.ok) {
+        const duration = performance.now() - startTime;
+        this.debug.logAPI('GET', url, response.status, duration);
         throw new Error(`HTTP error! status: ${response.status}`);
       }
 
       const blob = await response.blob();
+      const duration = performance.now() - startTime;
+      const sizeKB = (blob.size / 1024).toFixed(2);
+      this.debug.logAPI('GET', url, response.status, duration, { size: `${sizeKB} KB` });
+      this.debug.trackPerformance('downloadAttachment', duration);
+
       return blob;
     } catch (error) {
       console.error('Error downloading attachment:', error);
+      this.debug.log(`Failed to download attachment from ${url}: ${error.message}`, 'error', error);
       throw error;
     }
   }

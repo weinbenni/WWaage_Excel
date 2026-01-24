@@ -16,6 +16,7 @@ body {
 .downloader-header {
     text-align: center;
     margin-bottom: 30px;
+    position: relative;
 }
 
 .downloader-header h2 {
@@ -28,6 +29,46 @@ body {
 .downloader-header p {
     font-size: 1rem;
     color: #b8c5d0;
+}
+
+.debug-toggle-btn {
+    position: absolute;
+    top: 0;
+    right: 0;
+    background: rgba(247, 22, 53, 0.2);
+    border: 2px solid #F71635;
+    color: #F71635;
+    font-size: 1.2rem;
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.debug-toggle-btn:hover {
+    background: #F71635;
+    color: #ffffff;
+    transform: scale(1.1);
+}
+
+.debug-toggle-btn.active {
+    background: #F71635;
+    color: #ffffff;
+    box-shadow: 0 0 20px rgba(247, 22, 53, 0.6);
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        box-shadow: 0 0 20px rgba(247, 22, 53, 0.6);
+    }
+    50% {
+        box-shadow: 0 0 30px rgba(247, 22, 53, 0.9);
+    }
 }
 
 .source-section {
