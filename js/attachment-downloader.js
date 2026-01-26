@@ -625,79 +625,74 @@ class AttachmentDownloader {
         cards: cardsToDownload.map(c => ({ name: c.name, attachments: c.attachments.length }))
       });
 
-      this.updateProgress(40, `Found ${totalAttachments} attachment(s). Downloading...`);
+      this.updateProgress(40, `Found ${totalAttachments} attachment(s). Preparing download...`);
 
-      // Create ZIP file
-      const zipStartTime = performance.now();
-      const zip = new JSZip();
-      let downloadedCount = 0;
-      let failedCount = 0;
-      const failedAttachments = [];
-
+      // Prepare attachment metadata for backend
+      const attachmentList = [];
       for (const card of cardsToDownload) {
-        const cardFolderName = this.sanitizeFileName(card.name);
-        const cardFolder = zip.folder(cardFolderName);
-        this.debug.log(`Processing card: ${card.name}`, 'info', { attachments: card.attachments.length });
-
         for (const attachment of card.attachments) {
-          try {
-            // Download attachment with full info for API fallback strategies
-            const attachmentInfo = {
-              id: attachment.id,
-              cardId: card.id,
-              name: attachment.name,
-              isUpload: attachment.isUpload || false,
-              bytes: attachment.bytes || 0
-            };
-            const blob = await this.downloadAttachment(attachment.url, attachmentInfo);
-
-            // Add to ZIP
-            const fileName = this.sanitizeFileName(attachment.name);
-            cardFolder.file(fileName, blob);
-
-            downloadedCount++;
-            const progress = 40 + (downloadedCount / totalAttachments) * 50;
-            this.updateProgress(
-              progress,
-              `Downloading ${downloadedCount}/${totalAttachments} attachments...`
-            );
-            this.debug.log(`Downloaded: ${attachment.name} (${downloadedCount}/${totalAttachments})`, 'success');
-          } catch (error) {
-            failedCount++;
-            console.error(`Failed to download ${attachment.name}:`, error);
-            this.debug.log(`Failed to download: ${attachment.name}`, 'error', error);
-
-            // Track failed attachment with details
-            failedAttachments.push({
-              name: attachment.name,
-              cardName: card.name,
-              url: attachment.url,
-              error: error.message
-            });
-          }
+          attachmentList.push({
+            id: attachment.id,
+            cardId: card.id,
+            cardName: card.name,
+            name: attachment.name,
+            fileName: attachment.fileName || attachment.name,
+            url: attachment.url,
+            isUpload: attachment.isUpload || false,
+            bytes: attachment.bytes || 0
+          });
         }
       }
 
-      // If there are failed downloads, add a README to the ZIP
-      if (failedAttachments.length > 0) {
-        const readmeContent = this.generateFailedDownloadsReadme(failedAttachments);
-        zip.file('FAILED_DOWNLOADS.txt', readmeContent);
-        this.debug.log(`Created FAILED_DOWNLOADS.txt with ${failedAttachments.length} failed items`, 'warning');
+      this.debug.log('Prepared attachment list for backend', 'info', { count: attachmentList.length });
+      this.debug.snapshot('Attachment List', { attachments: attachmentList.slice(0, 5) }); // Sample first 5
+
+      // Get Trello token for backend authentication
+      const token = await this.t.getRestApi().getToken();
+      if (!token) {
+        throw new Error('Failed to get Trello authentication token');
       }
 
-      // Generate and save ZIP
-      this.updateProgress(95, 'Creating ZIP file...');
-      this.debug.log('Generating ZIP file...', 'info');
-      const zipBlob = await zip.generateAsync({ type: 'blob' });
-      const zipDuration = performance.now() - zipStartTime;
-      this.debug.trackPerformance('zipGeneration', zipDuration);
-      this.debug.log(`ZIP file created: ${(zipBlob.size / 1024 / 1024).toFixed(2)} MB`, 'success');
+      this.updateProgress(50, 'Sending request to server...');
+
+      // Call backend serverless function
+      const backendUrl = this.getBackendUrl();
+      this.debug.log(`Calling backend: ${backendUrl}`, 'info');
+
+      const backendStartTime = performance.now();
+      const response = await fetch(backendUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          attachments: attachmentList,
+          token: token
+        })
+      });
+
+      const backendDuration = performance.now() - backendStartTime;
+      this.debug.logAPI('POST', backendUrl, response.status, backendDuration);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Backend error: ${response.status} - ${errorText}`);
+      }
+
+      this.updateProgress(70, 'Receiving ZIP file from server...');
+      this.debug.log('Backend request successful, receiving ZIP...', 'success');
+
+      // Get the ZIP blob from response
+      const zipBlob = await response.blob();
+      const zipSize = (zipBlob.size / 1024 / 1024).toFixed(2);
+      this.debug.log(`ZIP file received: ${zipSize} MB`, 'success');
 
       // Download ZIP
       const zipFileName = this.source === 'card'
         ? `${this.sanitizeFileName(cardsToDownload[0].name)}_attachments.zip`
         : `Trello_Board_Attachments_${new Date().toISOString().split('T')[0]}.zip`;
 
+      this.updateProgress(95, 'Saving file...');
       saveAs(zipBlob, zipFileName);
 
       // Success
@@ -708,28 +703,19 @@ class AttachmentDownloader {
       this.debug.log('=== DOWNLOAD COMPLETE ===', 'system', {
         totalCards: cardsToDownload.length,
         totalAttachments,
-        downloaded: downloadedCount,
-        failed: failedCount,
-        zipSize: `${(zipBlob.size / 1024 / 1024).toFixed(2)} MB`,
-        duration: `${(totalDuration / 1000).toFixed(2)}s`
+        zipSize: `${zipSize} MB`,
+        duration: `${(totalDuration / 1000).toFixed(2)}s`,
+        method: 'backend'
       });
 
-      // Show appropriate success message
-      if (failedCount === 0) {
-        this.showStatus(
-          `✅ Successfully downloaded ${downloadedCount} attachments from ${cardsToDownload.length} card(s)`,
-          'success'
-        );
-      } else {
-        this.showStatus(
-          `⚠️ Downloaded ${downloadedCount} of ${totalAttachments} attachments (${failedCount} failed due to CORS restrictions)`,
-          'warning'
-        );
-        this.showStatus(
-          `Check FAILED_DOWNLOADS.txt in the ZIP for links to manually download failed items`,
-          'info'
-        );
-      }
+      this.showStatus(
+        `✅ Successfully downloaded ${totalAttachments} attachments from ${cardsToDownload.length} card(s) (${zipSize} MB)`,
+        'success'
+      );
+      this.showStatus(
+        `Check DOWNLOAD_SUMMARY.txt inside the ZIP for details`,
+        'info'
+      );
 
       setTimeout(() => {
         progressSection.style.display = 'none';
@@ -1045,6 +1031,27 @@ class AttachmentDownloader {
       this.debug.log(`Failed to download attachment: ${error.message}`, 'error', error);
       throw error;
     }
+  }
+
+  getBackendUrl() {
+    // Determine backend URL based on environment
+    const hostname = window.location.hostname;
+
+    // Local development
+    if (hostname === 'localhost' || hostname === '127.0.0.1') {
+      return 'http://localhost:3000/api/download-attachments';
+    }
+
+    // Production on Vercel or GitHub Pages
+    // If deployed to Vercel, use Vercel domain
+    // If on GitHub Pages, use Vercel deployment URL
+    if (hostname.includes('vercel.app')) {
+      return `https://${hostname}/api/download-attachments`;
+    }
+
+    // Default: GitHub Pages deployment with separate Vercel backend
+    // You'll need to set this to your Vercel deployment URL
+    return 'https://YOUR_VERCEL_DEPLOYMENT_URL/api/download-attachments';
   }
 
   generateFailedDownloadsReadme(failedAttachments) {

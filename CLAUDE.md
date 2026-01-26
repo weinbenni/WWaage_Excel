@@ -4,7 +4,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-This is a Trello Power-Up that allows importing Excel data (.xlsx, .xls, .csv) and converting it into Trello cards with flexible field mapping. The Power-Up is client-side only (no backend) and uses Trello's iframe-based Power-Up architecture.
+This is a Trello Power-Up with two main features:
+
+1. **Excel to Cards Importer**: Import Excel/CSV files and convert rows into Trello cards with flexible field mapping
+2. **Attachment Downloader**: Bulk download attachments from Trello cards using a serverless backend
 
 **Key Capabilities:**
 - Upload and parse Excel files using SheetJS
@@ -13,8 +16,16 @@ This is a Trello Power-Up that allows importing Excel data (.xlsx, .xls, .csv) a
 - **Address parsing**: Automatic detection and extraction of address components (PLZ, City, Street, Number)
 - **Address merging**: Automatically combine separate Straße, Ort, PLZ columns into complete addresses
 - Create Trello cards via REST API with labels, due dates, members, etc.
+- **Bulk download attachments**: Download hundreds of attachments at once, bypassing CORS restrictions via serverless backend
 
 ## Development Setup
+
+The Power-Up has two components:
+
+**Frontend (Static)**: HTML/CSS/JavaScript hosted on GitHub Pages
+**Backend (Serverless)**: Node.js functions hosted on Vercel (for attachment downloads)
+
+### Frontend Development
 
 This is a static web application with no build process. Simply host the files on any web server.
 
@@ -28,9 +39,29 @@ npx serve
 
 Then configure Trello Power-Up to point to `http://localhost:8000/html/main.html`
 
+### Backend Development
+
+For local backend testing:
+
+```bash
+# Install dependencies
+npm install
+
+# Start Vercel dev server
+vercel dev
+
+# Or use npm script
+npm run dev
+```
+
+Backend will be available at `http://localhost:3000/api/download-attachments`
+
 **Deployment locations:**
-- Production: GitHub Pages at https://weinbenni.github.io/trello-excel-powerup/
+- Frontend: GitHub Pages at https://weinbenni.github.io/trello-excel-powerup/
+- Backend: Vercel at `https://YOUR_VERCEL_URL/api/download-attachments`
 - Manifest connector URL points to hosted `index.html`
+
+**See [BACKEND_DEPLOYMENT.md](BACKEND_DEPLOYMENT.md) for complete deployment guide.**
 
 ## Architecture
 
@@ -330,6 +361,161 @@ Test cases to verify:
 4. Due date parsing (various formats)
 5. Reset clears all state
 
+## Attachment Downloader Architecture
+
+### Overview
+
+The Attachment Downloader allows bulk downloading of attachments from Trello cards. Due to Trello's CORS restrictions on their S3 bucket, direct client-side downloads are impossible. The solution uses a **serverless backend proxy**.
+
+**Location**: `js/attachment-downloader.js` (client), `api/download-attachments.js` (backend)
+
+### Why a Backend is Required
+
+**CORS Limitation**: Trello's attachment S3 bucket (`trello-attachments.s3.amazonaws.com`) lacks `Access-Control-Allow-Origin` headers, preventing browser JavaScript from downloading files directly.
+
+**Authentication Change (2021)**: Trello now requires OAuth 1.0 Authorization headers (not query parameters) for downloads. Browsers cannot set these headers for CORS requests.
+
+**Official Statement**: Per Atlassian staff (2022): "Currently, there is no other way" to download attachments from a client-side Power-Up without a backend proxy.
+
+### Architecture Flow
+
+```
+Client (Power-Up)                    Backend (Vercel)                Trello API
+─────────────────                    ────────────────                ──────────
+1. Collect attachments
+2. Get Trello token
+3. POST /api/download-attachments
+   { attachments: [...], token }
+                                4. Receive request
+                                5. For each attachment:
+                                   - Build download URL
+                                   - Add OAuth headers
+                                   - Download file         ────────> 6. Authenticate
+                                                          <──────── 7. Return file
+                                8. Create ZIP
+9. Receive ZIP blob           <──── 9. Stream ZIP
+10. Save to disk
+```
+
+### Client-Side Implementation
+
+**Key Method**: `handleDownload()` at line ~560
+
+**Workflow**:
+1. Fetch cards (from board or single card)
+2. Fetch attachments for each card
+3. Prepare attachment metadata array
+4. Get Trello token via `t.getRestApi().getToken()`
+5. POST to backend with attachments + token
+6. Receive ZIP blob
+7. Trigger browser download with `saveAs()`
+
+**Backend URL Detection**: `getBackendUrl()` method determines endpoint:
+- Local dev: `http://localhost:3000/api/download-attachments`
+- Vercel deployment: `https://YOUR_PROJECT.vercel.app/api/download-attachments`
+- GitHub Pages: Points to separate Vercel deployment
+
+### Backend Implementation
+
+**File**: `api/download-attachments.js`
+
+**Technology**:
+- Node.js serverless function (Vercel)
+- `https` module for downloads
+- `archiver` for ZIP creation
+
+**Process**:
+1. Validate request (attachments array + token)
+2. Set response headers for ZIP download
+3. Create ZIP archive stream
+4. For each attachment:
+   - Build Trello API download URL: `/cards/{cardId}/attachments/{id}/download/{fileName}?key=...&token=...`
+   - Download file using `https.get()`
+   - Add to ZIP under `{cardName}/{fileName}`
+   - Handle errors (add ERROR_*.txt)
+5. Add `DOWNLOAD_SUMMARY.txt`
+6. Finalize and stream ZIP to client
+
+**Error Handling**:
+- Individual file failures don't stop the batch
+- Failed downloads create `ERROR_{filename}.txt` with details
+- Summary includes success/failure counts
+
+### Configuration
+
+**Backend URL**: Update in `js/attachment-downloader.js` → `getBackendUrl()`:
+```javascript
+return 'https://YOUR_VERCEL_URL/api/download-attachments';
+```
+
+**API Key**: Hardcoded in both client and backend (`c9df6f6f1cd31f277375aa5dd43041c8`)
+
+**CORS**: Configured in `vercel.json` with wildcard origin
+
+### Deployment
+
+See [BACKEND_DEPLOYMENT.md](BACKEND_DEPLOYMENT.md) for complete guide.
+
+**Quick Start (Vercel)**:
+1. Push to GitHub
+2. Import in Vercel dashboard
+3. Deploy automatically
+4. Update `getBackendUrl()` with Vercel URL
+5. Test in Trello
+
+### Limitations
+
+**Vercel Hobby Plan**:
+- 10-second function timeout
+- 4.5 MB response size limit (for very large ZIPs)
+
+**Workarounds**:
+- Upgrade to Pro (60-second timeout)
+- Implement chunked downloads
+- Use cloud storage (S3, GCS) for large ZIPs
+
+### Debug System
+
+The attachment downloader includes an advanced debug panel:
+
+**Activation**:
+- Add `?debug=true` to URL
+- Or press `Ctrl+Shift+D`
+
+**Features**:
+- Real-time logging with categories (system, API, error, performance)
+- API call tracking with timing
+- Performance metrics (avg/min/max)
+- State snapshots
+- Export logs as JSON
+
+**Debug Panel Tabs**:
+- **Logs**: All console output with timestamps
+- **API Calls**: HTTP requests with status/duration
+- **Performance**: Operation timing statistics
+- **State**: Snapshots of application state
+
+### Common Issues
+
+**"Backend error: 500"**:
+- Check Vercel function logs
+- Verify Trello token is valid
+- Check network connectivity to Trello API
+
+**"Failed to get Trello authentication token"**:
+- User hasn't authorized Power-Up
+- Call `t.getRestApi().authorize()` first
+
+**Empty ZIP or Missing Files**:
+- Check Vercel logs for download errors
+- Verify attachment URLs are accessible
+- Check DOWNLOAD_SUMMARY.txt for details
+
+**CORS Errors**:
+- Ensure `vercel.json` includes CORS headers
+- Verify backend URL is correct
+- Check browser console for specific errors
+
 ## File Structure Reference
 
 ```
@@ -337,22 +523,34 @@ Test cases to verify:
 ├── manifest.json               # Power-Up configuration for Trello
 ├── js/
 │   ├── powerup.js              # Trello Power-Up registration (39 lines)
-│   └── main.js                 # Main application logic (700+ lines)
+│   ├── main.js                 # Excel importer logic (700+ lines)
+│   └── attachment-downloader.js # Attachment downloader client (~1000 lines)
 ├── html/
-│   └── main.html               # UI interface (modal content)
+│   ├── main.html               # Excel importer UI
+│   └── attachment-downloader.html # Attachment downloader UI
 ├── css/
 │   └── styles.css              # Complete styling (~900 lines)
 ├── assets/
 │   ├── icon-dark.svg           # Power-Up icon (dark theme)
 │   └── icon-light.svg          # Power-Up icon (light theme)
+├── api/                        # ⭐ Serverless backend functions
+│   ├── download-attachments.js # Attachment download proxy (~200 lines)
+│   └── README.md               # Backend API documentation
 ├── examples/
 │   ├── sample_tasks.xlsx       # Example Excel file
 │   ├── sample_tasks.csv        # Example CSV file
 │   └── usage_examples.md       # Usage documentation
+├── package.json                # ⭐ Node.js dependencies (backend)
+├── vercel.json                 # ⭐ Vercel deployment config
+├── .gitignore                  # Git ignore rules
 ├── README.md                   # User documentation
 ├── PROJECT_SUMMARY.md          # Feature overview
-└── DEPLOYMENT_GUIDE.md         # Deployment instructions
+├── DEPLOYMENT_GUIDE.md         # Frontend deployment
+├── BACKEND_DEPLOYMENT.md       # ⭐ Backend deployment guide
+└── CLAUDE.md                   # This file
 ```
+
+⭐ = New files for backend functionality
 
 ## Known Issues & Limitations
 

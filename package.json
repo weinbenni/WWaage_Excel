@@ -1,0 +1,24 @@
+{
+  "name": "trello-excel-powerup",
+  "version": "1.0.0",
+  "description": "Trello Power-Up for Excel import and attachment downloads",
+  "main": "index.html",
+  "scripts": {
+    "dev": "vercel dev",
+    "deploy": "vercel --prod"
+  },
+  "keywords": [
+    "trello",
+    "powerup",
+    "excel",
+    "attachments"
+  ],
+  "author": "Weinhäupl Waagenbau",
+  "license": "MIT",
+  "dependencies": {
+    "archiver": "^6.0.1"
+  },
+  "engines": {
+    "node": ">=18.x"
+  }
+}
