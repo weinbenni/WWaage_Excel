@@ -632,6 +632,7 @@ class AttachmentDownloader {
       const zip = new JSZip();
       let downloadedCount = 0;
       let failedCount = 0;
+      const failedAttachments = [];
 
       for (const card of cardsToDownload) {
         const cardFolderName = this.sanitizeFileName(card.name);
@@ -640,10 +641,13 @@ class AttachmentDownloader {
 
         for (const attachment of card.attachments) {
           try {
-            // Download attachment with card and attachment IDs for API fallback
+            // Download attachment with full info for API fallback strategies
             const attachmentInfo = {
               id: attachment.id,
-              cardId: card.id
+              cardId: card.id,
+              name: attachment.name,
+              isUpload: attachment.isUpload || false,
+              bytes: attachment.bytes || 0
             };
             const blob = await this.downloadAttachment(attachment.url, attachmentInfo);
 
@@ -662,9 +666,23 @@ class AttachmentDownloader {
             failedCount++;
             console.error(`Failed to download ${attachment.name}:`, error);
             this.debug.log(`Failed to download: ${attachment.name}`, 'error', error);
-            this.showStatus(`Failed to download: ${attachment.name}`, 'warning');
+
+            // Track failed attachment with details
+            failedAttachments.push({
+              name: attachment.name,
+              cardName: card.name,
+              url: attachment.url,
+              error: error.message
+            });
           }
         }
+      }
+
+      // If there are failed downloads, add a README to the ZIP
+      if (failedAttachments.length > 0) {
+        const readmeContent = this.generateFailedDownloadsReadme(failedAttachments);
+        zip.file('FAILED_DOWNLOADS.txt', readmeContent);
+        this.debug.log(`Created FAILED_DOWNLOADS.txt with ${failedAttachments.length} failed items`, 'warning');
       }
 
       // Generate and save ZIP
@@ -696,10 +714,22 @@ class AttachmentDownloader {
         duration: `${(totalDuration / 1000).toFixed(2)}s`
       });
 
-      this.showStatus(
-        `✅ Successfully downloaded ${downloadedCount} attachments from ${cardsToDownload.length} card(s)`,
-        'success'
-      );
+      // Show appropriate success message
+      if (failedCount === 0) {
+        this.showStatus(
+          `✅ Successfully downloaded ${downloadedCount} attachments from ${cardsToDownload.length} card(s)`,
+          'success'
+        );
+      } else {
+        this.showStatus(
+          `⚠️ Downloaded ${downloadedCount} of ${totalAttachments} attachments (${failedCount} failed due to CORS restrictions)`,
+          'warning'
+        );
+        this.showStatus(
+          `Check FAILED_DOWNLOADS.txt in the ZIP for links to manually download failed items`,
+          'info'
+        );
+      }
 
       setTimeout(() => {
         progressSection.style.display = 'none';
@@ -810,7 +840,9 @@ class AttachmentDownloader {
 
           const attachments = await response.json();
           this.debug.logAPI('GET', url, response.status, apiDuration, { count: attachments.length });
-          this.debug.log(`Card "${card.name}": ${attachments.length} attachment(s)`, 'info');
+          this.debug.log(`Card "${card.name}": ${attachments.length} attachment(s)`, 'info', {
+            attachments: attachments.map(a => ({ name: a.name, isUpload: a.isUpload, bytes: a.bytes }))
+          });
           return { ...card, attachments };
         } catch (error) {
           console.error(`Error fetching attachments for card ${card.id}:`, error);
@@ -829,112 +861,214 @@ class AttachmentDownloader {
     return cardsWithAttachments;
   }
 
-  async downloadAttachment(url, attachmentId = null) {
+  async downloadAttachment(url, attachmentInfo = null) {
     const startTime = performance.now();
     try {
-      this.debug.log(`Attempting to download from: ${url}`, 'info');
+      this.debug.log(`Attempting to download from: ${url}`, 'info', attachmentInfo);
 
-      // Try multiple download strategies
       let blob = null;
       let response = null;
 
-      // Strategy 1: Try direct fetch with CORS mode
-      try {
-        response = await fetch(url, {
-          mode: 'cors',
-          credentials: 'omit',
-          headers: {
-            'Accept': '*/*'
-          }
-        });
+      // Detect if this is an external URL or Trello-hosted attachment
+      const isTrelloUpload = attachmentInfo?.isUpload === true;
+      const isTrelloHosted = url.includes('trello.com') || url.includes('trello-attachments') || isTrelloUpload;
+      const isExternalUrl = !isTrelloHosted;
 
-        if (response.ok) {
-          blob = await response.blob();
-          this.debug.log('Strategy 1 (direct CORS) succeeded', 'success');
-        }
-      } catch (e) {
-        this.debug.log(`Strategy 1 failed: ${e.message}`, 'warning');
-      }
+      this.debug.log(`Attachment type: ${isExternalUrl ? 'External Link' : (isTrelloUpload ? 'Trello Upload' : 'Trello-hosted')}`, 'info');
 
-      // Strategy 2: If direct fetch failed, try with no-cors mode (will get opaque response)
-      if (!blob) {
+      // Strategy 1: External URLs - try direct download
+      if (isExternalUrl) {
         try {
           response = await fetch(url, {
-            mode: 'no-cors'
-          });
-
-          blob = await response.blob();
-
-          // Check if we got a valid blob (no-cors gives opaque response with 0 size)
-          if (blob.size === 0) {
-            this.debug.log('Strategy 2 (no-cors) returned empty blob', 'warning');
-            blob = null;
-          } else {
-            this.debug.log('Strategy 2 (no-cors) succeeded', 'success');
-          }
-        } catch (e) {
-          this.debug.log(`Strategy 2 failed: ${e.message}`, 'warning');
-        }
-      }
-
-      // Strategy 3: Try to download via Trello API if we have attachment ID
-      if (!blob && attachmentId) {
-        try {
-          const token = await this.t.getRestApi().getToken();
-          const apiUrl = `https://api.trello.com/1/cards/${attachmentId.cardId}/attachments/${attachmentId.id}/download?key=${APP_KEY}&token=${token}`;
-
-          response = await fetch(apiUrl, {
             mode: 'cors',
             credentials: 'omit'
           });
 
           if (response.ok) {
             blob = await response.blob();
-            this.debug.log('Strategy 3 (API download) succeeded', 'success');
+            this.debug.log('Strategy 1 (external URL) succeeded', 'success');
+          }
+        } catch (e) {
+          this.debug.log(`Strategy 1 failed: ${e.message}`, 'warning');
+        }
+      }
+
+      // Strategy 2: For Trello attachments, use Trello REST API with proper authentication
+      if (!blob && isTrelloHosted && attachmentInfo) {
+        try {
+          const token = await this.t.getRestApi().getToken();
+
+          // Use Trello's REST API to fetch attachment data
+          const apiUrl = `https://api.trello.com/1/cards/${attachmentInfo.cardId}/attachments/${attachmentInfo.id}`;
+
+          this.debug.log('Fetching attachment metadata from API', 'info');
+          const metaResponse = await fetch(`${apiUrl}?key=${APP_KEY}&token=${token}`);
+
+          if (metaResponse.ok) {
+            const attachmentMeta = await metaResponse.json();
+            this.debug.log('Attachment metadata received', 'info', attachmentMeta);
+
+            // Try to download from the url in metadata
+            const downloadUrl = attachmentMeta.url;
+
+            // Check if URL is a direct link (some attachments have public URLs)
+            if (downloadUrl && !downloadUrl.includes('/download/')) {
+              try {
+                response = await fetch(downloadUrl, {
+                  mode: 'cors',
+                  credentials: 'omit'
+                });
+
+                if (response.ok) {
+                  blob = await response.blob();
+                  this.debug.log('Strategy 2a (public URL from metadata) succeeded', 'success');
+                }
+              } catch (e) {
+                this.debug.log(`Strategy 2a failed: ${e.message}`, 'warning');
+              }
+            }
+
+            // Try authenticated download URL
+            if (!blob && downloadUrl) {
+              try {
+                const separator = downloadUrl.includes('?') ? '&' : '?';
+                const authUrl = `${downloadUrl}${separator}key=${APP_KEY}&token=${token}`;
+
+                response = await fetch(authUrl);
+
+                if (response.ok) {
+                  blob = await response.blob();
+                  this.debug.log('Strategy 2b (authenticated URL) succeeded', 'success');
+                }
+              } catch (e) {
+                this.debug.log(`Strategy 2b failed: ${e.message}`, 'warning');
+              }
+            }
+          }
+        } catch (e) {
+          this.debug.log(`Strategy 2 (API metadata) failed: ${e.message}`, 'warning');
+        }
+      }
+
+      // Strategy 3: Try original URL with no-cors (for compatibility)
+      if (!blob) {
+        try {
+          response = await fetch(url, {
+            mode: 'no-cors',
+            credentials: 'omit'
+          });
+
+          blob = await response.blob();
+
+          if (blob.size === 0) {
+            this.debug.log('Strategy 3 (no-cors) returned empty blob', 'warning');
+            blob = null;
+          } else {
+            this.debug.log('Strategy 3 (no-cors) succeeded', 'success');
           }
         } catch (e) {
           this.debug.log(`Strategy 3 failed: ${e.message}`, 'warning');
         }
       }
 
-      // Strategy 4: Try appending token to original URL
-      if (!blob) {
+      // Strategy 4: Try using XMLHttpRequest with credentials (sometimes better than fetch)
+      if (!blob && attachmentInfo) {
         try {
           const token = await this.t.getRestApi().getToken();
-          const separator = url.includes('?') ? '&' : '?';
-          const authenticatedUrl = `${url}${separator}key=${APP_KEY}&token=${token}`;
+          const xhrUrl = `${url}${url.includes('?') ? '&' : '?'}key=${APP_KEY}&token=${token}`;
 
-          response = await fetch(authenticatedUrl, {
-            mode: 'cors',
-            credentials: 'omit'
+          blob = await new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('GET', xhrUrl, true);
+            xhr.responseType = 'blob';
+            xhr.withCredentials = false;
+
+            xhr.onload = function() {
+              if (xhr.status === 200 && xhr.response && xhr.response.size > 0) {
+                resolve(xhr.response);
+              } else {
+                reject(new Error(`XHR failed with status ${xhr.status}`));
+              }
+            };
+
+            xhr.onerror = function() {
+              reject(new Error('XHR network error'));
+            };
+
+            xhr.send();
+          });
+
+          this.debug.log('Strategy 4 (XMLHttpRequest) succeeded', 'success');
+        } catch (e) {
+          this.debug.log(`Strategy 4 failed: ${e.message}`, 'warning');
+          blob = null;
+        }
+      }
+
+      // Strategy 5: Try using Trello's iframe proxy capability
+      if (!blob && attachmentInfo) {
+        try {
+          // Some Trello attachments can be accessed via a proxy method
+          const token = await this.t.getRestApi().getToken();
+
+          // Build proper API URL
+          const proxyUrl = `https://api.trello.com/1/cards/${attachmentInfo.cardId}/attachments/${attachmentInfo.id}/download/${attachmentInfo.name}?key=${APP_KEY}&token=${token}`;
+
+          response = await fetch(proxyUrl, {
+            credentials: 'include',
+            redirect: 'follow'
           });
 
           if (response.ok) {
             blob = await response.blob();
-            this.debug.log('Strategy 4 (authenticated URL) succeeded', 'success');
+            this.debug.log('Strategy 5 (API proxy) succeeded', 'success');
           }
         } catch (e) {
-          this.debug.log(`Strategy 4 failed: ${e.message}`, 'warning');
+          this.debug.log(`Strategy 5 failed: ${e.message}`, 'warning');
         }
       }
 
       if (!blob || blob.size === 0) {
         const duration = performance.now() - startTime;
         this.debug.logAPI('GET', url, response?.status || 0, duration);
-        throw new Error('All download strategies failed - CORS or authentication issue');
+        throw new Error('All download strategies failed - likely CORS restriction. Trello may block downloads from this origin.');
       }
 
       const duration = performance.now() - startTime;
       const sizeKB = (blob.size / 1024).toFixed(2);
-      this.debug.logAPI('GET', url, response.status, duration, { size: `${sizeKB} KB` });
+      this.debug.logAPI('GET', url, response?.status || 200, duration, { size: `${sizeKB} KB` });
       this.debug.trackPerformance('downloadAttachment', duration);
 
       return blob;
     } catch (error) {
       console.error('Error downloading attachment:', error);
-      this.debug.log(`Failed to download attachment from ${url}: ${error.message}`, 'error', error);
+      this.debug.log(`Failed to download attachment: ${error.message}`, 'error', error);
       throw error;
     }
+  }
+
+  generateFailedDownloadsReadme(failedAttachments) {
+    let content = '# Failed Downloads\n\n';
+    content += `The following ${failedAttachments.length} attachment(s) could not be downloaded automatically due to CORS restrictions.\n`;
+    content += 'You can download them manually using the links below:\n\n';
+    content += '---\n\n';
+
+    failedAttachments.forEach((item, index) => {
+      content += `${index + 1}. ${item.name}\n`;
+      content += `   Card: ${item.cardName}\n`;
+      content += `   URL: ${item.url}\n`;
+      content += `   Error: ${item.error}\n\n`;
+    });
+
+    content += '---\n\n';
+    content += 'CORS Information:\n';
+    content += 'Trello restricts direct file downloads from external domains for security.\n';
+    content += 'To download these files:\n';
+    content += '1. Click the URL links above (they will open in your browser)\n';
+    content += '2. Your browser will handle the authentication and download\n';
+    content += '3. Or access them directly from the Trello cards\n';
+
+    return content;
   }
 
   sanitizeFileName(fileName) {
