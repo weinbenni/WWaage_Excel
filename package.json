@@ -4,7 +4,6 @@
   "description": "Trello Power-Up for Excel import and attachment downloads",
   "main": "index.html",
   "scripts": {
-    "dev": "vercel dev",
     "deploy": "vercel --prod"
   },
   "keywords": [
