@@ -1051,7 +1051,7 @@ class AttachmentDownloader {
 
     // Default: GitHub Pages deployment with separate Vercel backend
     // You'll need to set this to your Vercel deployment URL
-    return 'https://YOUR_VERCEL_DEPLOYMENT_URL/api/download-attachments';
+    return 'https://w-waage-excel.vercel.app/api/download-attachments';
   }
 
   generateFailedDownloadsReadme(failedAttachments) {

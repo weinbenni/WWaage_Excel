@@ -3,7 +3,10 @@
     "allow": [
       "Bash(start test_read_excel.html)",
       "Bash(open:*)",
-      "Bash(xdg-open:*)"
+      "Bash(xdg-open:*)",
+      "WebFetch(domain:community.developer.atlassian.com)",
+      "WebSearch",
+      "WebFetch(domain:tinypowerups.com)"
     ]
   }
 }
