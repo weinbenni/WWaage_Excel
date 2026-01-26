@@ -54,28 +54,35 @@ module.exports = async (req, res) => {
       try {
         console.log(`Downloading: ${attachment.name} from card ${attachment.cardName}`);
 
-        // Build download URL with authentication
         let downloadUrl = attachment.url;
-
         console.log(`Original URL: ${downloadUrl}`);
-        console.log(`Is Trello URL: ${downloadUrl.includes('trello.com')}`);
-        console.log(`Has /download/: ${downloadUrl.includes('/download/')}`);
 
-        // Check if this is a Trello download endpoint (needs auth params)
+        // For Trello download URLs, fetch attachment metadata to get proper download URL
         if (downloadUrl.includes('trello.com') && downloadUrl.includes('/download/')) {
-          // Convert trello.com URLs to api.trello.com if needed
-          if (downloadUrl.startsWith('https://trello.com/')) {
-            downloadUrl = downloadUrl.replace('https://trello.com/', 'https://api.trello.com/');
-            console.log(`Converted to API URL: ${downloadUrl}`);
-          }
+          console.log(`Trello download URL detected, fetching attachment metadata...`);
 
-          // Add authentication query parameters
-          const separator = downloadUrl.includes('?') ? '&' : '?';
-          downloadUrl = `${downloadUrl}${separator}key=${APP_KEY}&token=${token}`;
-          console.log(`Final auth URL: ${downloadUrl.substring(0, 150)}...`);
-        } else {
-          console.log(`Using URL as-is (S3 or external)`);
+          // Get attachment metadata from Trello API
+          const metadataUrl = `https://api.trello.com/1/cards/${attachment.cardId}/attachments/${attachment.id}?key=${APP_KEY}&token=${token}`;
+          console.log(`Fetching metadata from: ${metadataUrl.substring(0, 100)}...`);
+
+          try {
+            const metadata = await fetchJson(metadataUrl);
+            console.log(`Metadata fetched. URL in metadata: ${metadata.url?.substring(0, 100)}`);
+
+            // Use the URL from metadata (might be S3 signed URL)
+            if (metadata.url) {
+              downloadUrl = metadata.url;
+              console.log(`Using URL from metadata`);
+            }
+          } catch (metaError) {
+            console.error(`Failed to fetch metadata: ${metaError.message}`);
+            // Fall back to original URL with auth params
+            downloadUrl = `https://api.trello.com${downloadUrl.substring(downloadUrl.indexOf('/1/'))}?key=${APP_KEY}&token=${token}`;
+            console.log(`Falling back to direct API URL with auth`);
+          }
         }
+
+        console.log(`Final download URL: ${downloadUrl.substring(0, 150)}...`);
 
         // Download attachment
         const fileBuffer = await downloadFile(downloadUrl);
@@ -124,6 +131,35 @@ ${failed > 0 ? '\nNote: Check individual ERROR_*.txt files for failed downloads.
     }
   }
 };
+
+/**
+ * Fetch JSON data from URL
+ */
+function fetchJson(url) {
+  return new Promise((resolve, reject) => {
+    https.get(url, (response) => {
+      if (response.statusCode !== 200) {
+        reject(new Error(`HTTP ${response.statusCode}: ${response.statusMessage}`));
+        return;
+      }
+
+      let data = '';
+      response.on('data', (chunk) => {
+        data += chunk;
+      });
+
+      response.on('end', () => {
+        try {
+          resolve(JSON.parse(data));
+        } catch (error) {
+          reject(new Error('Failed to parse JSON'));
+        }
+      });
+
+      response.on('error', reject);
+    }).on('error', reject);
+  });
+}
 
 /**
  * Download file from URL and return as Buffer
