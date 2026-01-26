@@ -53,10 +53,18 @@ module.exports = async (req, res) => {
       try {
         console.log(`Downloading: ${attachment.name} from card ${attachment.cardName}`);
 
-        // Use the attachment URL directly
-        // Backend can access S3 URLs without CORS restrictions
-        // The attachment.url from Trello already contains necessary authentication/signature
-        const downloadUrl = attachment.url;
+        // Build download URL with authentication
+        let downloadUrl = attachment.url;
+
+        // Check if this is a Trello download endpoint (needs auth params)
+        if (downloadUrl.includes('trello.com') && downloadUrl.includes('/download/')) {
+          // Add authentication query parameters
+          const separator = downloadUrl.includes('?') ? '&' : '?';
+          downloadUrl = `${downloadUrl}${separator}key=${APP_KEY}&token=${token}`;
+        }
+        // Otherwise, it's likely an S3 URL or external link (use as-is)
+
+        console.log(`Download URL: ${downloadUrl.substring(0, 100)}...`);
 
         // Download attachment
         const fileBuffer = await downloadFile(downloadUrl);
@@ -109,12 +117,24 @@ ${failed > 0 ? '\nNote: Check individual ERROR_*.txt files for failed downloads.
 /**
  * Download file from URL and return as Buffer
  */
-function downloadFile(url) {
+function downloadFile(url, redirectCount = 0) {
   return new Promise((resolve, reject) => {
+    // Prevent infinite redirect loops
+    if (redirectCount > 5) {
+      reject(new Error('Too many redirects'));
+      return;
+    }
+
+    console.log(`Downloading from: ${url.substring(0, 150)}...`);
+
     https.get(url, (response) => {
+      console.log(`Response status: ${response.statusCode}`);
+
       // Follow redirects
-      if (response.statusCode === 301 || response.statusCode === 302) {
-        return downloadFile(response.headers.location)
+      if (response.statusCode === 301 || response.statusCode === 302 || response.statusCode === 307) {
+        const redirectUrl = response.headers.location;
+        console.log(`Following redirect to: ${redirectUrl.substring(0, 150)}...`);
+        return downloadFile(redirectUrl, redirectCount + 1)
           .then(resolve)
           .catch(reject);
       }
@@ -131,11 +151,16 @@ function downloadFile(url) {
       });
 
       response.on('end', () => {
-        resolve(Buffer.concat(chunks));
+        const buffer = Buffer.concat(chunks);
+        console.log(`Downloaded ${buffer.length} bytes`);
+        resolve(buffer);
       });
 
       response.on('error', reject);
-    }).on('error', reject);
+    }).on('error', (error) => {
+      console.error(`Download error: ${error.message}`);
+      reject(error);
+    });
   });
 }
 
