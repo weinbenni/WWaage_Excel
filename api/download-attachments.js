@@ -30,6 +30,7 @@ module.exports = async (req, res) => {
     }
 
     console.log(`Processing ${attachments.length} attachments`);
+    console.log(`Token received: ${token.substring(0, 20)}...${token.substring(token.length - 10)}`);
 
     // Set response headers for ZIP download
     const timestamp = new Date().toISOString().split('T')[0];
@@ -56,15 +57,25 @@ module.exports = async (req, res) => {
         // Build download URL with authentication
         let downloadUrl = attachment.url;
 
+        console.log(`Original URL: ${downloadUrl}`);
+        console.log(`Is Trello URL: ${downloadUrl.includes('trello.com')}`);
+        console.log(`Has /download/: ${downloadUrl.includes('/download/')}`);
+
         // Check if this is a Trello download endpoint (needs auth params)
         if (downloadUrl.includes('trello.com') && downloadUrl.includes('/download/')) {
+          // Convert trello.com URLs to api.trello.com if needed
+          if (downloadUrl.startsWith('https://trello.com/')) {
+            downloadUrl = downloadUrl.replace('https://trello.com/', 'https://api.trello.com/');
+            console.log(`Converted to API URL: ${downloadUrl}`);
+          }
+
           // Add authentication query parameters
           const separator = downloadUrl.includes('?') ? '&' : '?';
           downloadUrl = `${downloadUrl}${separator}key=${APP_KEY}&token=${token}`;
+          console.log(`Final auth URL: ${downloadUrl.substring(0, 150)}...`);
+        } else {
+          console.log(`Using URL as-is (S3 or external)`);
         }
-        // Otherwise, it's likely an S3 URL or external link (use as-is)
-
-        console.log(`Download URL: ${downloadUrl.substring(0, 100)}...`);
 
         // Download attachment
         const fileBuffer = await downloadFile(downloadUrl);
