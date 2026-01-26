@@ -808,35 +808,48 @@ class AttachmentDownloader {
     this.debug.log(`Fetching attachments for ${cards.length} cards`, 'info');
 
     const token = await this.t.getRestApi().getToken();
+    const cardsWithAttachments = [];
 
-    const cardsWithAttachments = await Promise.all(
-      cards.map(async (card) => {
+    // Process cards in batches to avoid rate limiting
+    const BATCH_SIZE = 10; // Process 10 cards at a time
+    const DELAY_BETWEEN_BATCHES = 1000; // 1 second delay between batches
+    const DELAY_BETWEEN_REQUESTS = 100; // 100ms delay between individual requests
+
+    for (let i = 0; i < cards.length; i += BATCH_SIZE) {
+      const batch = cards.slice(i, i + BATCH_SIZE);
+      const batchNum = Math.floor(i / BATCH_SIZE) + 1;
+      const totalBatches = Math.ceil(cards.length / BATCH_SIZE);
+
+      this.debug.log(`Processing batch ${batchNum}/${totalBatches} (${batch.length} cards)`, 'info');
+
+      // Update progress
+      const progressPercent = 20 + Math.floor((i / cards.length) * 20); // 20-40% range
+      this.updateProgress(progressPercent, `Fetching attachments: ${i + batch.length}/${cards.length} cards...`);
+
+      // Process batch sequentially with delays
+      for (const card of batch) {
         try {
           const url = `https://api.trello.com/1/cards/${card.id}/attachments?key=${APP_KEY}&token=${token}`;
-          const apiStart = performance.now();
-          const response = await fetch(url);
-          const apiDuration = performance.now() - apiStart;
 
-          if (!response.ok) {
-            console.error(`Failed to fetch attachments for card ${card.id}`);
-            this.debug.logAPI('GET', url, response.status, apiDuration);
-            this.debug.log(`No attachments for card: ${card.name}`, 'warning');
-            return { ...card, attachments: [] };
-          }
+          // Fetch with retry logic for 429 errors
+          const result = await this.fetchWithRetry(url, card.name);
+          cardsWithAttachments.push({ ...card, attachments: result.attachments });
 
-          const attachments = await response.json();
-          this.debug.logAPI('GET', url, response.status, apiDuration, { count: attachments.length });
-          this.debug.log(`Card "${card.name}": ${attachments.length} attachment(s)`, 'info', {
-            attachments: attachments.map(a => ({ name: a.name, isUpload: a.isUpload, bytes: a.bytes }))
-          });
-          return { ...card, attachments };
+          // Small delay between requests within batch
+          await this.sleep(DELAY_BETWEEN_REQUESTS);
         } catch (error) {
           console.error(`Error fetching attachments for card ${card.id}:`, error);
           this.debug.log(`Error fetching attachments for card ${card.name}: ${error.message}`, 'error', error);
-          return { ...card, attachments: [] };
+          cardsWithAttachments.push({ ...card, attachments: [] });
         }
-      })
-    );
+      }
+
+      // Delay between batches (except after last batch)
+      if (i + BATCH_SIZE < cards.length) {
+        this.debug.log(`Waiting ${DELAY_BETWEEN_BATCHES}ms before next batch...`, 'info');
+        await this.sleep(DELAY_BETWEEN_BATCHES);
+      }
+    }
 
     const duration = performance.now() - startTime;
     this.debug.trackPerformance('fetchAttachmentsForCards', duration);
@@ -845,6 +858,63 @@ class AttachmentDownloader {
     this.debug.log(`Fetched ${totalAttachments} total attachments from ${cards.length} cards`, 'success');
 
     return cardsWithAttachments;
+  }
+
+  async fetchWithRetry(url, cardName, maxRetries = 3) {
+    const apiStart = performance.now();
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const response = await fetch(url);
+        const apiDuration = performance.now() - apiStart;
+
+        // Handle rate limiting with exponential backoff
+        if (response.status === 429) {
+          const retryAfter = response.headers.get('Retry-After');
+          const waitTime = retryAfter ? parseInt(retryAfter) * 1000 : Math.pow(2, attempt) * 1000;
+
+          this.debug.log(`Rate limited on card "${cardName}". Waiting ${waitTime}ms before retry ${attempt}/${maxRetries}`, 'warning');
+          this.debug.logAPI('GET', url, response.status, apiDuration);
+
+          if (attempt < maxRetries) {
+            await this.sleep(waitTime);
+            continue; // Retry
+          } else {
+            this.debug.log(`Max retries reached for card: ${cardName}`, 'error');
+            return { attachments: [] };
+          }
+        }
+
+        if (!response.ok) {
+          console.error(`Failed to fetch attachments for card: ${cardName}`);
+          this.debug.logAPI('GET', url, response.status, apiDuration);
+          this.debug.log(`No attachments for card: ${cardName}`, 'warning');
+          return { attachments: [] };
+        }
+
+        const attachments = await response.json();
+        this.debug.logAPI('GET', url, response.status, apiDuration, { count: attachments.length });
+        this.debug.log(`Card "${cardName}": ${attachments.length} attachment(s)`, 'info', {
+          attachments: attachments.map(a => ({ name: a.name, isUpload: a.isUpload, bytes: a.bytes }))
+        });
+
+        return { attachments };
+      } catch (error) {
+        this.debug.log(`Attempt ${attempt}/${maxRetries} failed for card "${cardName}": ${error.message}`, 'error', error);
+
+        if (attempt < maxRetries) {
+          const waitTime = Math.pow(2, attempt) * 1000;
+          await this.sleep(waitTime);
+          continue;
+        }
+
+        throw error;
+      }
+    }
+  }
+
+  sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   async downloadAttachment(url, attachmentInfo = null) {

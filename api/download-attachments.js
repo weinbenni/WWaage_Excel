@@ -53,8 +53,10 @@ module.exports = async (req, res) => {
       try {
         console.log(`Downloading: ${attachment.name} from card ${attachment.cardName}`);
 
-        // Build download URL
-        const downloadUrl = `https://api.trello.com/1/cards/${attachment.cardId}/attachments/${attachment.id}/download/${encodeURIComponent(attachment.fileName || attachment.name)}?key=${APP_KEY}&token=${token}`;
+        // Use the attachment URL directly
+        // Backend can access S3 URLs without CORS restrictions
+        // The attachment.url from Trello already contains necessary authentication/signature
+        const downloadUrl = attachment.url;
 
         // Download attachment
         const fileBuffer = await downloadFile(downloadUrl);
