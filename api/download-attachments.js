@@ -84,8 +84,19 @@ module.exports = async (req, res) => {
 
         console.log(`Final download URL: ${downloadUrl.substring(0, 150)}...`);
 
+        // Prepare download options with OAuth headers for Trello URLs
+        const downloadOptions = {};
+
+        if (downloadUrl.includes('trello.com')) {
+          // Use OAuth header authentication (works for Trello download endpoints)
+          downloadOptions.headers = {
+            'Authorization': `OAuth oauth_consumer_key="${APP_KEY}", oauth_token="${token}"`
+          };
+          console.log(`Using OAuth header authentication for Trello URL`);
+        }
+
         // Download attachment
-        const fileBuffer = await downloadFile(downloadUrl);
+        const fileBuffer = await downloadFile(downloadUrl, downloadOptions);
 
         // Sanitize folder and file names
         const folderName = sanitizeFileName(attachment.cardName);
@@ -134,10 +145,14 @@ ${failed > 0 ? '\nNote: Check individual ERROR_*.txt files for failed downloads.
 
 /**
  * Fetch JSON data from URL
+ * @param {string} url - URL to fetch from
+ * @param {object} headers - Optional headers to include
  */
-function fetchJson(url) {
+function fetchJson(url, headers = {}) {
   return new Promise((resolve, reject) => {
-    https.get(url, (response) => {
+    const requestOptions = Object.keys(headers).length > 0 ? { headers } : {};
+
+    https.get(url, requestOptions, (response) => {
       if (response.statusCode !== 200) {
         reject(new Error(`HTTP ${response.statusCode}: ${response.statusMessage}`));
         return;
@@ -163,8 +178,12 @@ function fetchJson(url) {
 
 /**
  * Download file from URL and return as Buffer
+ * @param {string} url - URL to download from
+ * @param {object} options - Additional options (headers, redirectCount)
  */
-function downloadFile(url, redirectCount = 0) {
+function downloadFile(url, options = {}) {
+  const { headers = {}, redirectCount = 0 } = options;
+
   return new Promise((resolve, reject) => {
     // Prevent infinite redirect loops
     if (redirectCount > 5) {
@@ -173,15 +192,22 @@ function downloadFile(url, redirectCount = 0) {
     }
 
     console.log(`Downloading from: ${url.substring(0, 150)}...`);
+    if (Object.keys(headers).length > 0) {
+      console.log(`Using headers:`, headers);
+    }
 
-    https.get(url, (response) => {
+    const requestOptions = {
+      headers: headers
+    };
+
+    https.get(url, requestOptions, (response) => {
       console.log(`Response status: ${response.statusCode}`);
 
       // Follow redirects
       if (response.statusCode === 301 || response.statusCode === 302 || response.statusCode === 307) {
         const redirectUrl = response.headers.location;
         console.log(`Following redirect to: ${redirectUrl.substring(0, 150)}...`);
-        return downloadFile(redirectUrl, redirectCount + 1)
+        return downloadFile(redirectUrl, { headers, redirectCount: redirectCount + 1 })
           .then(resolve)
           .catch(reject);
       }
