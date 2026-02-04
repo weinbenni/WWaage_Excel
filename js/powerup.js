@@ -10,7 +10,7 @@ window.TrelloPowerUp.initialize({
       callback: function(t) {
         return t.modal({
           title: 'Weinhäupl Power-Up Suite',
-          url: t.signUrl('./html/app-hub.html'),
+          url: t.signUrl('./html/app-hub.html?_=' + Date.now()),
           accentColor: '#F71635',
           height: 600,
           width: 800
@@ -28,7 +28,7 @@ window.TrelloPowerUp.initialize({
       callback: function(t) {
         return t.modal({
           title: 'Excel to Cards Importer',
-          url: t.signUrl('./html/main.html'),
+          url: t.signUrl('./html/main.html?_=' + Date.now()),
           accentColor: '#0079BF',
           height: 650,
           width: 900

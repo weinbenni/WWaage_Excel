@@ -16,7 +16,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Open Excel Import modal
         t.modal({
           title: 'Excel to Cards Importer',
-          url: t.signUrl('./main.html'),
+          url: t.signUrl('./main.html?_=' + Date.now()),
           height: 650,
           width: 900
         });
@@ -24,7 +24,7 @@ document.addEventListener('DOMContentLoaded', () => {
         // Open Attachment Downloader modal
         t.modal({
           title: 'Attachment Downloader',
-          url: t.signUrl('./attachment-downloader.html?source=board'),
+          url: t.signUrl('./attachment-downloader.html?source=board&_=' + Date.now()),
           height: 500,
           width: 700
         });
