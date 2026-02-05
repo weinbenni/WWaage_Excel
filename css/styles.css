@@ -834,6 +834,51 @@ body {
   transform: scale(1.1);
 }
 
+/* Draggable badge wrapper */
+.badge-wrapper {
+  display: inline-flex;
+  align-items: center;
+  cursor: grab;
+  user-select: none;
+}
+.badge-wrapper:active {
+  cursor: grabbing;
+}
+.badge-wrapper.dragging {
+  opacity: 0.4;
+}
+.query-display.drag-over {
+  border-color: #F71635;
+  background: #fff0f2;
+}
+.badge-wrapper.drag-target-before {
+  border-left: 3px solid #F71635;
+  padding-left: 4px;
+}
+.badge-wrapper.drag-target-after {
+  border-right: 3px solid #F71635;
+  padding-right: 4px;
+}
+
+/* Prebuilt phrase buttons */
+.prebuilt-btn {
+  padding: 6px 10px;
+  background: transparent;
+  color: #666;
+  border: 1.5px solid #bbb;
+  border-radius: 5px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: none;
+}
+.prebuilt-btn:hover {
+  background: #f0f0f0;
+  border-color: #999;
+  transform: none;
+  box-shadow: none;
+}
+
 .query-actions {
   display: flex;
   gap: 10px;

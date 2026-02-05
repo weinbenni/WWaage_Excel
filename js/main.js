@@ -446,6 +446,8 @@ class ExcelToCardsImporter {
                 <button type="button" class="add-text-btn" data-field="${field.id}" title="Add custom text">
                   + Add Text
                 </button>
+                <button type="button" class="prebuilt-btn" data-field="${field.id}" data-preset="newline" title="New line (\\n)">↵</button>
+                <button type="button" class="prebuilt-btn" data-field="${field.id}" data-preset="dash" title="Dash separator ( - )">—</button>
                 <button type="button" class="clear-query-btn" data-field="${field.id}" title="Clear">
                   Clear
                 </button>
@@ -477,7 +479,21 @@ class ExcelToCardsImporter {
         this.clearQuery(fieldId);
       });
     });
-    
+
+    const PREBUILT_VALUES = { newline: '\\n', dash: ' - ' };
+    container.querySelectorAll('.prebuilt-btn').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const fieldId = e.target.dataset.field;
+        const value = PREBUILT_VALUES[e.target.dataset.preset];
+        if (value) this.addToQuery(fieldId, 'text', value);
+      });
+    });
+
+    // Set up drop targets for drag-and-drop reorder (once per field)
+    this.availableFields.forEach(field => {
+      this.setupDropTarget(field.id);
+    });
+
     // Show mappings section
     document.getElementById('mappingsSection').style.display = 'block';
   }
@@ -683,7 +699,7 @@ class ExcelToCardsImporter {
         badge = `<span class="query-badge text-badge">"${part.value}"</span>`;
       }
 
-      return `${badge}<button class="remove-part-btn" data-field="${fieldId}" data-index="${index}">×</button>`;
+      return `<div class="badge-wrapper" draggable="true" data-field="${fieldId}" data-index="${index}">${badge}<button class="remove-part-btn" data-field="${fieldId}" data-index="${index}">×</button></div>`;
     }).join('');
 
     // Add remove listeners
@@ -694,6 +710,8 @@ class ExcelToCardsImporter {
         this.removeFromQuery(field, index);
       });
     });
+
+    this.setupDragListeners(fieldId);
   }
   
   removeFromQuery(fieldId, index) {
@@ -712,6 +730,69 @@ class ExcelToCardsImporter {
     this.updateQueryDisplay(fieldId);
   }
   
+  setupDropTarget(fieldId) {
+    const display = document.getElementById(`display-${fieldId}`);
+
+    display.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      display.classList.add('drag-over');
+      const wrappers = [...display.querySelectorAll('.badge-wrapper:not(.dragging)')];
+      wrappers.forEach(w => w.classList.remove('drag-target-before', 'drag-target-after'));
+      let closest = null, closestDist = Infinity;
+      wrappers.forEach(w => {
+        const rect = w.getBoundingClientRect();
+        const dist = Math.abs(e.clientX - (rect.left + rect.width / 2));
+        if (dist < closestDist) { closestDist = dist; closest = w; }
+      });
+      if (closest) {
+        const rect = closest.getBoundingClientRect();
+        closest.classList.add(e.clientX < rect.left + rect.width / 2 ? 'drag-target-before' : 'drag-target-after');
+      }
+    });
+
+    display.addEventListener('dragleave', (e) => {
+      if (!display.contains(e.relatedTarget)) {
+        display.classList.remove('drag-over');
+        display.querySelectorAll('.badge-wrapper').forEach(w => w.classList.remove('drag-target-before', 'drag-target-after'));
+      }
+    });
+
+    display.addEventListener('drop', (e) => {
+      e.preventDefault();
+      display.classList.remove('drag-over');
+      const data = JSON.parse(e.dataTransfer.getData('text/plain'));
+      if (data.field !== fieldId) return;
+      const sourceIndex = data.index;
+      let targetIndex = this.queryParts[fieldId].length;
+      display.querySelectorAll('.badge-wrapper').forEach(w => {
+        if (w.classList.contains('drag-target-before'))  targetIndex = parseInt(w.dataset.index);
+        if (w.classList.contains('drag-target-after'))   targetIndex = parseInt(w.dataset.index) + 1;
+        w.classList.remove('drag-target-before', 'drag-target-after');
+      });
+      const parts = this.queryParts[fieldId];
+      const [moved] = parts.splice(sourceIndex, 1);
+      parts.splice(sourceIndex < targetIndex ? targetIndex - 1 : targetIndex, 0, moved);
+      this.updateQueryDisplay(fieldId);
+      this.buildSyntax(fieldId);
+    });
+  }
+
+  setupDragListeners(fieldId) {
+    const display = document.getElementById(`display-${fieldId}`);
+    display.querySelectorAll('.badge-wrapper').forEach(wrapper => {
+      wrapper.addEventListener('dragstart', (e) => {
+        e.dataTransfer.setData('text/plain', JSON.stringify({ field: fieldId, index: parseInt(wrapper.dataset.index) }));
+        e.dataTransfer.effectAllowed = 'move';
+        wrapper.classList.add('dragging');
+      });
+      wrapper.addEventListener('dragend', () => {
+        wrapper.classList.remove('dragging');
+        display.querySelectorAll('.badge-wrapper').forEach(w => w.classList.remove('drag-target-before', 'drag-target-after'));
+        display.classList.remove('drag-over');
+      });
+    });
+  }
+
   buildSyntax(fieldId) {
     const parts = this.queryParts[fieldId] || [];
 
